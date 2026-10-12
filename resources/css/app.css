@@ -3159,6 +3159,11 @@ input[type="search"]::-webkit-search-results-decoration {
     grid-template-columns: minmax(10rem, 1.3fr) minmax(8rem, 1fr) minmax(8rem, 1fr) 8rem 9.5rem;
 }
 
+.distribution-upgrades-table-grid {
+    grid-template-columns: 11rem minmax(10rem, 1.2fr) 8rem 12rem minmax(12rem, 1.6fr);
+    min-width: 52rem;
+}
+
 .server-resources-unmanaged-table-grid {
     grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.5fr) 7rem minmax(9rem, auto);
 }

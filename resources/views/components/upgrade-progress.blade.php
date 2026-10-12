@@ -1,4 +1,4 @@
-@props(['step' => 0])
+@props(['step' => 0, 'steps' => null])
 
 {{--
     Step Mapping (Backend → UI):
@@ -10,7 +10,7 @@
     The currentStep variable is inherited from parent Alpine component (upgradeModal).
 --}}
 @php
-    $steps = [
+    $steps ??= [
         1 => 'Preparing',
         2 => 'Helper',
         3 => 'Image',

@@ -2,8 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Actions\Distribution\RunAutomaticDistributionUpdate;
 use App\Actions\Server\UpdateCoolify;
 use App\Models\Server;
+use App\Services\Distribution\BuildIdentity;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -25,6 +27,12 @@ class UpdateCoolifyJob implements ShouldBeEncrypted, ShouldQueue
 
     public function handle(): void
     {
+        if (BuildIdentity::current()->isCustom()) {
+            RunAutomaticDistributionUpdate::run();
+
+            return;
+        }
+
         try {
             CheckForUpdatesJob::dispatchSync();
             $settings = instanceSettings();

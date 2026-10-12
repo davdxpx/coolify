@@ -2,25 +2,26 @@
     x-init="$wire.checkUpdate" x-data="upgradeModal({
         currentVersion: @js($currentVersion),
         latestVersion: @js($latestVersion),
-        devMode: @js($devMode)
+        devMode: @js($devMode),
+        isCustom: @js($isCustomDistribution)
     })">
     @if ($isUpgradeAvailable)
         <div :class="{ 'z-40': modalOpen }" class="relative w-auto h-auto">
             @if ($fullButton)
-                <x-forms.button type="button" @click="modalOpen=true" x-show="!showProgress" x-cloak isHighlighted>
+                <x-forms.button type="button" @click="openModal()" x-show="!showProgress" x-cloak isHighlighted>
                     Upgrade now
                 </x-forms.button>
-                <x-forms.button type="button" @click="modalOpen=true" x-show="showProgress" x-cloak isHighlighted>
+                <x-forms.button type="button" @click="openModal()" x-show="showProgress" x-cloak isHighlighted>
                     Updating…
                 </x-forms.button>
             @else
             <button type="button" title="Upgrade in progress" aria-label="Upgrade in progress"
-                @click="modalOpen=true" x-show="showProgress" x-cloak
+                @click="openModal()" x-show="showProgress" x-cloak
                 class="inline-flex h-[18px] cursor-pointer items-center rounded-full bg-coollabs/10 px-1.5 text-[9.5px] font-semibold leading-none text-coollabs ring-1 ring-inset ring-coollabs/25 transition-colors hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20">
                 Updating
             </button>
             <button type="button" title="Update available" aria-label="Update available"
-                @click="modalOpen=true" x-show="!showProgress" x-cloak
+                @click="openModal()" x-show="!showProgress" x-cloak
                 class="inline-flex h-[18px] cursor-pointer items-center rounded-full bg-coollabs/10 px-1.5 text-[9.5px] font-semibold leading-none text-coollabs ring-1 ring-inset ring-coollabs/25 transition-colors hover:bg-coollabs/15 dark:bg-warning/15 dark:text-warning dark:ring-warning/25 dark:hover:bg-warning/20">
                 Update available
             </button>
@@ -68,7 +69,11 @@
                             {{-- Progress View --}}
                             <template x-if="showProgress">
                                 <div class="flex flex-col gap-4">
-                                    <x-upgrade-progress />
+                                    @if ($isCustomDistribution)
+                                        <x-upgrade-progress :steps="[1 => 'Download', 2 => 'Verify', 3 => 'Configure', 4 => 'Restart']" />
+                                    @else
+                                        <x-upgrade-progress />
+                                    @endif
 
                                     <div class="flex items-center justify-center gap-1.5 text-[12px]"
                                         style="color: var(--coollabs-subtle)">
@@ -144,6 +149,62 @@
                                         <p>Any deployments running during the update process will fail.</p>
                                     </x-callout>
 
+                                    @if ($isCustomDistribution)
+                                        <div class="flex flex-col gap-3" aria-live="polite">
+                                            <p class="text-[12px] leading-5" style="color: var(--coollabs-subtle)"
+                                                x-show="preflightLoading">Running update checks…</p>
+                                            <template x-if="preflight && preflight.target">
+                                                <dl class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-[12px] leading-5">
+                                                    <dt style="color: var(--coollabs-subtle)">Release</dt>
+                                                    <dd class="font-mono text-neutral-800 dark:text-fg" x-text="preflight.target.version"></dd>
+                                                    <dt style="color: var(--coollabs-subtle)">Build</dt>
+                                                    <dd class="font-mono text-neutral-800 dark:text-fg" x-text="preflight.target.build"></dd>
+                                                    <dt style="color: var(--coollabs-subtle)">Coolify base</dt>
+                                                    <dd class="font-mono text-neutral-800 dark:text-fg" x-text="preflight.target.base_version"></dd>
+                                                    <dt style="color: var(--coollabs-subtle)">Commit</dt>
+                                                    <dd class="font-mono text-neutral-800 dark:text-fg" x-text="preflight.target.commit"></dd>
+                                                    <dt style="color: var(--coollabs-subtle)">Image digest</dt>
+                                                    <dd class="truncate font-mono text-neutral-800 dark:text-fg" x-text="preflight.target.digest"></dd>
+                                                </dl>
+                                            </template>
+                                            <template x-if="preflight && !preflight.target && !preflightLoading">
+                                                <p class="text-[12px] leading-5" style="color: var(--coollabs-subtle)">No installable release is available on the selected channel.</p>
+                                            </template>
+                                            <ul class="flex flex-col divide-y divide-neutral-200 rounded-lg border border-neutral-200 dark:divide-white/[0.08] dark:border-white/[0.08]"
+                                                x-show="preflight && preflight.checks.length > 0" aria-label="Update checks">
+                                                <template x-for="check in (preflight ? preflight.checks : [])" :key="check.id">
+                                                    <li class="flex items-start gap-2.5 px-3 py-2">
+                                                        <span class="mt-0.5 inline-flex h-[18px] shrink-0 items-center rounded-full px-1.5 text-[10px] font-semibold uppercase ring-1 ring-inset"
+                                                            :class="{
+                                                                'bg-emerald-500/10 text-emerald-700 ring-emerald-500/25 dark:text-emerald-400': check.state === 'passed',
+                                                                'bg-amber-500/10 text-amber-700 ring-amber-500/25 dark:text-amber-400': check.state === 'warning' || check.state === 'unknown',
+                                                                'bg-red-500/10 text-red-700 ring-red-500/25 dark:text-red-400': check.state === 'failed',
+                                                                'bg-neutral-500/10 text-neutral-600 ring-neutral-500/25 dark:text-fg-dim': check.state === 'skipped'
+                                                            }"
+                                                            x-text="check.state"></span>
+                                                        <div class="min-w-0 flex-1">
+                                                            <p class="text-[13px] font-medium leading-5 text-neutral-800 dark:text-fg" x-text="check.label"></p>
+                                                            <p class="text-[12px] leading-5" style="color: var(--coollabs-subtle)" x-text="check.summary"></p>
+                                                            <template x-if="check.blocks && check.overridable">
+                                                                <label class="mt-1 flex cursor-pointer items-center gap-2 text-[12px] text-neutral-700 dark:text-fg">
+                                                                    <input type="checkbox" class="rounded" :value="check.id" x-model="acknowledged">
+                                                                    <span>Proceed despite this check</span>
+                                                                </label>
+                                                            </template>
+                                                        </div>
+                                                    </li>
+                                                </template>
+                                            </ul>
+                                            <template x-if="acknowledged.length > 0">
+                                                <label class="flex flex-col gap-1 text-[12px] text-neutral-700 dark:text-fg">
+                                                    <span>Reason for proceeding (recorded in the audit log)</span>
+                                                    <textarea x-model="acknowledgementReason" rows="2" maxlength="1000"
+                                                        class="input min-h-0 text-[13px]"></textarea>
+                                                </label>
+                                            </template>
+                                        </div>
+                                    @endif
+
                                     <p class="text-[12px] leading-5" style="color: var(--coollabs-subtle)">
                                         If something goes wrong, check the
                                         <a class="font-medium text-coollabs underline decoration-coollabs/30 underline-offset-2 hover:decoration-coollabs dark:text-warning dark:decoration-warning/30 dark:hover:decoration-warning"
@@ -160,7 +221,8 @@
                                                 Simulate
                                             </x-forms.button>
                                         </template>
-                                        <x-forms.button @click="confirmed" isHighlighted type="button">
+                                        <x-forms.button @click="confirmed" isHighlighted type="button"
+                                            x-bind:disabled="!canConfirm()">
                                             Upgrade now
                                         </x-forms.button>
                                     </div>
@@ -198,6 +260,49 @@
             successCountdown: 3,
             currentVersion: config.currentVersion || '',
             latestVersion: config.latestVersion || '',
+            isCustom: config.isCustom || false,
+            preflight: null,
+            preflightLoading: false,
+            acknowledged: [],
+            acknowledgementReason: '',
+            confirming: false,
+
+            openModal() {
+                this.modalOpen = true;
+                if (this.isCustom && !this.showProgress) {
+                    this.loadPreflight();
+                }
+            },
+
+            async loadPreflight() {
+                if (this.preflightLoading) {
+                    return;
+                }
+                this.preflightLoading = true;
+                try {
+                    this.preflight = await this.withTimeout(this.$wire.preflight(), 120000);
+                    const allowed = (this.preflight?.checks ?? []).filter((check) => check.blocks && check.overridable).map((check) => check.id);
+                    this.acknowledged = this.acknowledged.filter((id) => allowed.includes(id));
+                } catch (error) {
+                    this.preflight = { target: null, checks: [], blocked: true };
+                } finally {
+                    this.preflightLoading = false;
+                }
+            },
+
+            canConfirm() {
+                if (!this.isCustom) {
+                    return true;
+                }
+                if (this.confirming || this.preflightLoading || !this.preflight || !this.preflight.target) {
+                    return false;
+                }
+                const unresolved = this.preflight.checks.some((check) => check.blocks && !(check.overridable && this.acknowledged.includes(check.id)));
+                if (unresolved) {
+                    return false;
+                }
+                return this.acknowledged.length === 0 || this.acknowledgementReason.trim().length >= 5;
+            },
             serviceDown: false,
             instanceWentDown: false,
             devMode: config.devMode || false,
@@ -234,13 +339,33 @@
                 }, 2000);
             },
 
-            confirmed() {
+            async confirmed() {
+                if (this.isCustom) {
+                    if (!this.canConfirm()) {
+                        return;
+                    }
+                    this.confirming = true;
+                    let started = false;
+                    try {
+                        started = await this.withTimeout(this.$wire.$call('upgrade', this.acknowledged, this.acknowledgementReason), 120000);
+                    } catch (error) {
+                        started = false;
+                    } finally {
+                        this.confirming = false;
+                    }
+                    if (started !== true) {
+                        this.loadPreflight();
+                        return;
+                    }
+                }
                 this.showProgress = true;
                 this.currentStep = 1;
                 this.currentStatus = 'Starting upgrade...';
                 this.startTimer();
                 // Trigger server-side upgrade script via Livewire
-                this.$wire.$call('upgrade');
+                if (!this.isCustom) {
+                    this.$wire.$call('upgrade');
+                }
                 // Start client-side status polling
                 this.upgrade();
                 // Prevent accidental navigation during upgrade
@@ -278,6 +403,11 @@
             },
 
             mapStepToUI(apiStep) {
+                if (this.isCustom) {
+                    if (apiStep <= 3) return Math.max(apiStep, 1);
+                    if (apiStep <= 5) return 4;
+                    return 5;
+                }
                 // Map backend steps (1-6) to UI steps (1-4)
                 // Backend: 1=config, 2=env, 3=pull, 4=stop, 5=start, 6=complete
                 // UI: 1=prepare, 2=pull images, 3=pull coolify, 4=restart
