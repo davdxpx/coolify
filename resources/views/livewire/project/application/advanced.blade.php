@@ -120,6 +120,7 @@
                         ]" :disabled="! $canUpdate" />
                 </div>
             </x-application.settings-section>
+            <livewire:project.application.zero-downtime :application="$application" :key="'zero-downtime-'.$application->uuid" />
         @endif
 
         <x-application.settings-section id="advanced-proxy-section" title="Proxy"
