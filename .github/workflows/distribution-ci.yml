@@ -85,9 +85,17 @@ jobs:
           APP_EVENTS_CACHE: /tmp/coolify-test-cache/events.php
           APP_SERVICES_CACHE: /tmp/coolify-test-cache/services.php
           APP_PACKAGES_CACHE: /tmp/coolify-test-cache/packages.php
+        # The suite expects Coolify's development container, which runs as root (open-file limits,
+        # libvirt storage paths, dev script fixtures).
         run: |
           mkdir -p /tmp/coolify-test-cache
-          vendor/bin/pest --compact tests/Unit tests/Feature tests/v4/Feature
+          sudo --preserve-env env "PATH=$PATH" php vendor/bin/pest --compact --log-junit /tmp/coolify-junit.xml tests/Unit tests/Feature tests/v4/Feature
+
+      - name: List failed tests
+        if: ${{ failure() }}
+        run: |
+          # shellcheck disable=SC2016
+          php -r '$xml = simplexml_load_file("/tmp/coolify-junit.xml"); foreach ($xml->xpath("//testcase[failure or error]") as $case) { $node = $case->failure ?: $case->error; echo $case["class"], " > ", $case["name"], PHP_EOL, "    ", strtok(trim((string) $node), PHP_EOL), PHP_EOL; }'
 
       - name: Record migration state
         id: migrations
