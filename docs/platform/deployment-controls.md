@@ -25,6 +25,7 @@ Besides the built-in checks of a release (resources, dependencies, servers), a r
 | `deployment_freeze` | Always on | If every active freeze allows it |
 | `release_window` | Days, from, until, time zone | Yes |
 | `backup_freshness` | Required database backup age in hours: every database of the environment (standalone and service databases) needs an enabled schedule with a successful run that is not older | Yes |
+| `configuration` | Always on: contract keys present and not empty, shared variable references exist ([configuration.md](configuration.md)) | Yes |
 
 A failed check pauses the release before its first deployment. On the release page, admins can tick the failed checks, give a reason and continue. Through the API, pass `acknowledged_checks` and `acknowledgement_reason` when starting a release (useful for a pipeline that ships an approved hotfix), or `POST /releases/{uuid}/resume` with `mode: override`. The release stores which checks were overridden and why.
 

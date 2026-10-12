@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\ApplicationSecretManagerController;
 use App\Http\Controllers\Api\AuditEventsController;
 use App\Http\Controllers\Api\CloudInitScriptsController;
 use App\Http\Controllers\Api\CloudProviderTokensController;
+use App\Http\Controllers\Api\ConfigurationController;
 use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
 use App\Http\Controllers\Api\DeploymentFreezesController;
@@ -169,6 +170,11 @@ Route::group([
     Route::post('/deployment-freezes', [DeploymentFreezesController::class, 'store'])->middleware(['api.ability:write']);
     Route::post('/deployment-freezes/{uuid}/end', [DeploymentFreezesController::class, 'end'])->middleware(['api.ability:write']);
     Route::get('/servers/{uuid}/build-capacity', [ReleasesController::class, 'build_capacity'])->middleware(['api.ability:read']);
+    Route::get('/configuration/environments/{uuid}', [ConfigurationController::class, 'environment'])->middleware(['api.ability:read']);
+    Route::get('/configuration/shared-variables/{id}/rotation-plan', [ConfigurationController::class, 'rotationPlan'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/configuration-contract', [ConfigurationController::class, 'contract'])->middleware(['api.ability:read']);
+    Route::put('/applications/{uuid}/configuration-contract', [ConfigurationController::class, 'updateContract'])->middleware(['api.ability:write']);
+    Route::delete('/applications/{uuid}/configuration-contract', [ConfigurationController::class, 'deleteContract'])->middleware(['api.ability:write']);
 
     Route::get('/servers', [ServersController::class, 'servers'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}', [ServersController::class, 'server_by_uuid'])->middleware(['api.ability:read']);

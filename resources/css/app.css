@@ -3197,6 +3197,16 @@ input[type="search"]::-webkit-search-results-decoration {
     min-width: 40rem;
 }
 
+.configuration-report-table-grid {
+    grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.4fr) minmax(14rem, 1.6fr) minmax(12rem, 1.4fr) minmax(10rem, 1fr);
+    min-width: 62rem;
+}
+
+.configuration-shared-table-grid {
+    grid-template-columns: minmax(14rem, 1.2fr) 9rem minmax(14rem, 2fr);
+    min-width: 40rem;
+}
+
 .server-resources-unmanaged-table-grid {
     grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.5fr) 7rem minmax(9rem, auto);
 }

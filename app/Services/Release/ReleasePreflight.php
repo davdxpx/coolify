@@ -4,10 +4,13 @@ namespace App\Services\Release;
 
 use App\Enums\PreflightState;
 use App\Models\Application;
+use App\Models\ConfigurationContract;
 use App\Models\DeploymentFreeze;
 use App\Models\Release;
 use App\Models\ReleaseMember;
 use App\Services\Backup\BackupFreshness;
+use App\Services\Configuration\ConfigurationReport;
+use App\Services\Configuration\SharedVariableGraph;
 use App\Services\Deployment\BuildCapacity;
 use App\Services\Deployment\DeploymentFreezeGuard;
 use App\Services\Preflight\PreflightResult;
@@ -37,11 +40,51 @@ class ReleasePreflight
             $this->dependencies($members),
             $this->servers($members, $applications),
             $this->deploymentFreeze($applications),
+            $this->configuration($release, $applications),
             isset($policy['release_window']) ? $this->releaseWindow((array) $policy['release_window']) : null,
             isset($policy['backup_max_age_hours']) ? $this->backups($release, (int) $policy['backup_max_age_hours']) : null,
             $this->overlappingReleases($release, $members),
             $this->deploymentQueues($applications),
         ]));
+    }
+
+    /**
+     * Required keys of configuration contracts and references to shared variables that do not exist.
+     *
+     * @param  Collection<int, Application>  $applications
+     */
+    private function configuration(Release $release, Collection $applications): PreflightResult
+    {
+        $edges = (new SharedVariableGraph((int) $release->team_id))->edges((int) $release->group->environment_id);
+        $contracts = ConfigurationContract::query()->whereIn('application_id', $applications->pluck('id'))->get()->keyBy('application_id');
+        $report = new ConfigurationReport;
+        $problems = [];
+        foreach ($applications as $application) {
+            $applicationEdges = $edges->where('resource_uuid', $application->uuid);
+            foreach ($applicationEdges->where('missing', true) as $edge) {
+                $problems[] = "{$application->name}: {$edge['variable_key']} refers to {$edge['shared_type']}.{$edge['shared_key']}, which does not exist.";
+            }
+            $contract = $contracts->get($application->id);
+            if ($contract !== null) {
+                $check = $report->checkContract($contract, $application->environment_variables()->where('is_preview', false)->get(), $applicationEdges);
+                if ($check['missing'] !== []) {
+                    $problems[] = "{$application->name} misses ".implode(', ', $check['missing']).'.';
+                }
+                if ($check['empty'] !== []) {
+                    $problems[] = "{$application->name} has empty ".implode(', ', $check['empty']).'.';
+                }
+            }
+        }
+
+        return new PreflightResult(
+            id: 'configuration',
+            label: 'Configuration',
+            state: $problems === [] ? PreflightState::PASSED : PreflightState::FAILED,
+            summary: $problems === [] ? 'Required variables are set and every shared variable reference exists.' : implode(' ', array_unique($problems)),
+            overridable: true,
+            remediation: $problems === [] ? null : 'Set the missing variables, or continue with an audited reason.',
+            category: 'configuration',
+        );
     }
 
     /**

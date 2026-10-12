@@ -29,6 +29,7 @@ use App\Livewire\Project\Application\Configuration as ApplicationConfiguration;
 use App\Livewire\Project\Application\Deployment\Index as DeploymentIndex;
 use App\Livewire\Project\Application\Deployment\Show as DeploymentShow;
 use App\Livewire\Project\CloneMe as ProjectCloneMe;
+use App\Livewire\Project\Configuration\Index as EnvironmentConfigurationIndex;
 use App\Livewire\Project\Database\Backup\Execution as DatabaseBackupExecution;
 use App\Livewire\Project\Database\Backup\Index as DatabaseBackupIndex;
 use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
@@ -289,6 +290,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
     });
     Route::get('/deployment-freezes', DeploymentFreezesIndex::class)->name('deployment-freezes.index');
+    Route::get('/project/{project_uuid}/environment/{environment_uuid}/configuration', EnvironmentConfigurationIndex::class)->name('project.configuration.index');
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/releases')->group(function () {
         Route::get('/', ReleaseGroupIndex::class)->name('project.release-group.index');
         Route::get('/{release_group_uuid}', ReleaseGroupShow::class)->name('project.release-group.show');

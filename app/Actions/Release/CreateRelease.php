@@ -26,7 +26,7 @@ class CreateRelease
     /**
      * Checks that may be acknowledged up front, for example by a pipeline that releases a hotfix during a freeze.
      */
-    public const OVERRIDABLE_CHECKS = ['deployment_freeze', 'release_window', 'backup_freshness'];
+    public const OVERRIDABLE_CHECKS = ['deployment_freeze', 'release_window', 'backup_freshness', 'configuration'];
 
     /**
      * @param  list<string>  $acknowledged

@@ -155,7 +155,7 @@ class ReleasesController extends Controller
         requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(type: 'object', properties: [
             new OA\Property(property: 'commit', type: 'string', description: 'Commit SHA, branch or tag for every application that builds from Git.'),
             new OA\Property(property: 'notes', type: 'string', maxLength: 2000),
-            new OA\Property(property: 'acknowledged_checks', type: 'array', items: new OA\Items(type: 'string', enum: ['deployment_freeze', 'release_window', 'backup_freshness']), description: 'Checks to override if they fail. Requires acknowledgement_reason; every override is audited.'),
+            new OA\Property(property: 'acknowledged_checks', type: 'array', items: new OA\Items(type: 'string', enum: ['deployment_freeze', 'release_window', 'backup_freshness', 'configuration']), description: 'Checks to override if they fail. Requires acknowledgement_reason; every override is audited.'),
             new OA\Property(property: 'acknowledgement_reason', type: 'string', maxLength: 500),
         ])),
         responses: [
