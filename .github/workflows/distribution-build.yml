@@ -1,0 +1,312 @@
+name: Distribution Build
+run-name: Distribution build ${{ github.run_number }} (${{ github.sha }})
+
+on:
+  push:
+    branches: ["main"]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "changelogs/**"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: distribution-build
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  SIGNATURE_ISSUER: https://token.actions.githubusercontent.com
+  MANIFEST_BRANCH: distribution
+
+jobs:
+  guard:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Only build the production branch of a custom distribution
+        if: ${{ github.ref != 'refs/heads/main' || github.repository == 'coollabsio/coolify' }}
+        run: |
+          echo "Distribution builds run from main of a custom distribution repository only."
+          exit 1
+
+  ci:
+    needs: guard
+    uses: ./.github/workflows/distribution-ci.yml
+    permissions:
+      contents: read
+
+  prepare:
+    needs: guard
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      base_version: ${{ steps.meta.outputs.base_version }}
+      build: ${{ steps.meta.outputs.build }}
+      distribution: ${{ steps.meta.outputs.distribution }}
+      image: ${{ steps.meta.outputs.image }}
+      manifest_url: ${{ steps.meta.outputs.manifest_url }}
+      signature_identity: ${{ steps.meta.outputs.signature_identity }}
+      version: ${{ steps.meta.outputs.version }}
+      helper_version: ${{ steps.meta.outputs.helper_version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Resolve distribution metadata
+        id: meta
+        run: |
+          BASE_VERSION=$(php bootstrap/getVersion.php)
+          if [[ ! "${BASE_VERSION}" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?(-(alpha|beta|rc)\.[0-9]+(\.[0-9]+)*)?$ ]]; then
+            echo "config/constants.php has no official base version (${BASE_VERSION})."
+            exit 1
+          fi
+          REPOSITORY="${GITHUB_REPOSITORY}"
+          IMAGE="${REGISTRY}/${REPOSITORY,,}"
+          ESCAPED_REPOSITORY=$(printf '%s' "${REPOSITORY}" | sed 's/[.]/\\./g')
+          HELPER_VERSION=$(php -r '$c = include "config/constants.php"; echo $c["coolify"]["helper_version"];' 2>/dev/null || echo "1.0.17")
+          {
+            echo "base_version=${BASE_VERSION}"
+            echo "build=${GITHUB_RUN_NUMBER}"
+            echo "distribution=${REPOSITORY}"
+            echo "image=${IMAGE}"
+            echo "manifest_url=https://raw.githubusercontent.com/${REPOSITORY}/${MANIFEST_BRANCH}/manifest.json"
+            echo "signature_identity=^https://github\\.com/${ESCAPED_REPOSITORY}/\\.github/workflows/distribution-build\\.yml@refs/heads/main\$"
+            echo "version=${BASE_VERSION}-dev.${GITHUB_RUN_NUMBER}"
+            echo "helper_version=${HELPER_VERSION}"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: [ci, prepare]
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            platform: linux/aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push (${{ matrix.arch }})
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/production/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          provenance: false
+          build-args: |
+            COOLIFY_VERSION=${{ needs.prepare.outputs.base_version }}
+            COOLIFY_DISTRIBUTION=${{ needs.prepare.outputs.distribution }}
+            COOLIFY_DISTRIBUTION_IMAGE=${{ needs.prepare.outputs.image }}
+            COOLIFY_DISTRIBUTION_MANIFEST_URL=${{ needs.prepare.outputs.manifest_url }}
+            COOLIFY_DISTRIBUTION_BUILD_NUMBER=${{ needs.prepare.outputs.build }}
+            COOLIFY_DISTRIBUTION_SIGNATURE_ISSUER=${{ env.SIGNATURE_ISSUER }}
+            COOLIFY_DISTRIBUTION_SIGNATURE_IDENTITY=${{ needs.prepare.outputs.signature_identity }}
+            COOLIFY_SOURCE_REPOSITORY=${{ github.server_url }}/${{ github.repository }}
+            COOLIFY_SOURCE_COMMIT=${{ github.sha }}
+            COOLIFY_BUILD_URL=${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.prepare.outputs.version }}
+          tags: |
+            ${{ needs.prepare.outputs.image }}:build-${{ needs.prepare.outputs.build }}-${{ matrix.arch }}
+
+  publish:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish the multi-architecture image
+        env:
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          BUILD: ${{ needs.prepare.outputs.build }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          docker buildx imagetools create \
+            "${IMAGE}:build-${BUILD}-amd64" \
+            "${IMAGE}:build-${BUILD}-aarch64" \
+            --tag "${IMAGE}:${VERSION}" \
+            --tag "${IMAGE}:sha-${GITHUB_SHA}"
+
+      - name: Resolve the immutable digest
+        id: digest
+        env:
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          DIGEST=$(docker buildx imagetools inspect "${IMAGE}:${VERSION}" --format '{{json .Manifest}}' | jq -r '.digest')
+          if [[ ! "${DIGEST}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Could not resolve the image digest (${DIGEST})."
+            exit 1
+          fi
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Sign the image digest
+        env:
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          DIGEST: ${{ steps.digest.outputs.digest }}
+        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-name: ${{ needs.prepare.outputs.image }}
+          subject-digest: ${{ steps.digest.outputs.digest }}
+          push-to-registry: true
+
+  verify:
+    needs: [ci, prepare, publish]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      identity: ${{ steps.identity.outcome }}
+      signature: ${{ steps.signature.outcome }}
+      upgrade: ${{ steps.upgrade.outcome }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: sigstore/cosign-installer@v3
+
+      - name: Verify the signature against the build policy
+        id: signature
+        env:
+          REFERENCE: ${{ needs.prepare.outputs.image }}@${{ needs.publish.outputs.digest }}
+          IDENTITY: ${{ needs.prepare.outputs.signature_identity }}
+        run: |
+          cosign verify \
+            --certificate-oidc-issuer "${SIGNATURE_ISSUER}" \
+            --certificate-identity-regexp "${IDENTITY}" \
+            "${REFERENCE}" > /dev/null
+
+      - name: Verify the commit and identity inside the image
+        id: identity
+        env:
+          REFERENCE: ${{ needs.prepare.outputs.image }}@${{ needs.publish.outputs.digest }}
+          EXPECTED: custom|${{ needs.prepare.outputs.distribution }}|${{ github.sha }}|${{ needs.prepare.outputs.build }}|${{ needs.prepare.outputs.image }}|${{ needs.prepare.outputs.base_version }}
+        run: |
+          docker pull "${REFERENCE}"
+          ACTUAL=$(docker run --rm --entrypoint php "${REFERENCE}" -r '$d = json_decode((string) file_get_contents("/var/www/html/build.json"), true); echo implode("|", [$d["type"], $d["distribution"], $d["source_commit"], $d["build_number"], $d["image_repository"], $d["base_version"]]);')
+          if [ "${ACTUAL}" != "${EXPECTED}" ]; then
+            echo "Image identity ${ACTUAL} does not match ${EXPECTED}."
+            exit 1
+          fi
+          for file in docker-compose.yml docker-compose.prod.yml .env.production upgrade-postgres.sh upgrade-distribution.sh; do
+            docker run --rm --entrypoint test "${REFERENCE}" -s "/usr/local/share/coolify/source/${file}"
+          done
+
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.MANIFEST_BRANCH }}
+          path: manifest
+          persist-credentials: false
+        continue-on-error: true
+
+      - name: Fresh installation and upgrade smoke test
+        id: upgrade
+        env:
+          TARGET: ${{ needs.prepare.outputs.image }}@${{ needs.publish.outputs.digest }}
+          BUILD: ${{ needs.prepare.outputs.build }}
+          BASE: ${{ needs.prepare.outputs.base_version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          DISTRIBUTION: ${{ needs.prepare.outputs.distribution }}
+          HELPER_VERSION: ${{ needs.prepare.outputs.helper_version }}
+          MIGRATION: ${{ needs.ci.outputs.latest_migration }}
+          IDENTITY: ${{ needs.prepare.outputs.signature_identity }}
+        run: |
+          FROM=""
+          if [ -f manifest/manifest.json ]; then
+            PREVIOUS=$(jq -r '.channels.development // empty' manifest/manifest.json)
+            if [ -n "${PREVIOUS}" ]; then
+              FROM="$(jq -r --argjson build "${PREVIOUS}" '.releases[] | select(.build == $build) | "\(.image)@\(.digest)"' manifest/manifest.json)"
+            fi
+          fi
+          ARGS=(--target "${TARGET}" --target-build "${BUILD}" --target-commit "${GITHUB_SHA}" --target-base "${BASE}" --target-version "${VERSION}" --distribution "${DISTRIBUTION}" --helper-version "${HELPER_VERSION}" --signature-issuer "${SIGNATURE_ISSUER}" --signature-identity-regexp "${IDENTITY}")
+          if [ -n "${MIGRATION}" ]; then
+            ARGS+=(--target-migration "${MIGRATION}")
+          fi
+          if [ -n "${FROM}" ]; then
+            echo "Upgrading from ${FROM}"
+            ARGS+=(--from "${FROM}")
+          else
+            echo "No earlier development build; testing a fresh installation."
+          fi
+          sudo -E bash scripts/distribution/upgrade-smoke-test.sh "${ARGS[@]}"
+
+  manifest:
+    needs: [ci, prepare, publish, verify]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    concurrency:
+      group: distribution-manifest
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+          path: source
+
+      - name: Publish the build on the development channel
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BUILD: ${{ needs.prepare.outputs.build }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          BASE: ${{ needs.prepare.outputs.base_version }}
+          IMAGE: ${{ needs.prepare.outputs.image }}
+          DIGEST: ${{ needs.publish.outputs.digest }}
+          DISTRIBUTION: ${{ needs.prepare.outputs.distribution }}
+          MIGRATION: ${{ needs.ci.outputs.latest_migration }}
+          MIGRATION_COUNT: ${{ needs.ci.outputs.migration_count }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CHECKS: tests=success,shellcheck=success,signature=${{ needs.verify.outputs.signature == 'success' && 'success' || 'failure' }},image-identity=${{ needs.verify.outputs.identity == 'success' && 'success' || 'failure' }},upgrade-smoke=${{ needs.verify.outputs.upgrade == 'success' && 'success' || 'failure' }}
+        run: bash source/scripts/distribution/publish-manifest.sh add-release
