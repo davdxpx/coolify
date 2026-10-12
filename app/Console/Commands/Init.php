@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Distribution\ReconcileDistributionUpgrades;
 use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Jobs\CheckHelperImageJob;
@@ -90,6 +91,11 @@ class Init extends Command
         } catch (\Throwable $e) {
             echo "Error in cleanup:stucked-resources command: {$e->getMessage()}\n";
             echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
+        }
+        try {
+            ReconcileDistributionUpgrades::run();
+        } catch (\Throwable $e) {
+            echo "Could not reconcile distribution upgrades: {$e->getMessage()}\n";
         }
         try {
             $updatedCount = ApplicationDeploymentQueue::whereIn('status', [

@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Actions\Distribution\ReconcileDistributionUpgrades;
 use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
@@ -18,7 +19,9 @@ use App\Jobs\RevalidateUnusableS3StoragesJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
+use App\Models\CoolifyUpgrade;
 use App\Models\InstanceSettings;
+use App\Services\Distribution\BuildIdentity;
 use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -167,7 +170,20 @@ class Kernel extends ConsoleKernel
             ->timezone($this->instanceTimezone)
             ->onOneServer();
 
-        if ($this->settings->is_auto_update_enabled) {
+        $isCustomDistribution = BuildIdentity::current()->isCustom();
+        if ($isCustomDistribution) {
+            $this->scheduleInstance->call(fn () => ReconcileDistributionUpgrades::dispatch())
+                ->name('distribution:reconcile-upgrades')
+                ->everyMinute()
+                ->onOneServer()
+                ->when(fn () => CoolifyUpgrade::query()->active()->exists());
+        }
+
+        $isAutoUpdateEnabled = $isCustomDistribution
+            ? (bool) $this->settings->is_distribution_auto_update_enabled
+            : $this->settings->is_auto_update_enabled;
+
+        if ($isAutoUpdateEnabled) {
             $autoUpdateFrequency = $this->settings->auto_update_frequency;
             $this->scheduleInstance->job(new UpdateCoolifyJob)
                 ->cron($autoUpdateFrequency)
