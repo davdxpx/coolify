@@ -22,6 +22,7 @@ use OpenApi\Attributes as OA;
         'requested_commit' => ['type' => 'string', 'nullable' => true],
         'failure_summary' => ['type' => 'string', 'nullable' => true],
         'attention_reason' => ['type' => 'string', 'nullable' => true],
+        'acknowledged_checks' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Failed checks that were overridden with a reason.'],
         'created_at' => ['type' => 'string', 'format' => 'date-time'],
         'started_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
         'finished_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
@@ -50,6 +51,8 @@ class Release extends BaseModel
         'source_release_id',
         'policy_snapshot',
         'preflight',
+        'acknowledged_checks',
+        'acknowledgement_reason',
         'summary',
         'failure_summary',
         'attention_reason',
@@ -66,6 +69,7 @@ class Release extends BaseModel
             'state' => ReleaseState::class,
             'policy_snapshot' => 'array',
             'preflight' => 'array',
+            'acknowledged_checks' => 'array',
             'summary' => 'array',
             'validated_at' => 'datetime',
             'started_at' => 'datetime',
@@ -127,6 +131,14 @@ class Release extends BaseModel
     public function verificationTimeoutSeconds(): int
     {
         return max(60, (int) data_get($this->policy_snapshot, 'verification_timeout_seconds', 600));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function acknowledgedChecks(): array
+    {
+        return array_values(array_filter((array) $this->acknowledged_checks, 'is_string'));
     }
 
     /**

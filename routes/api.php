@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\CloudInitScriptsController;
 use App\Http\Controllers\Api\CloudProviderTokensController;
 use App\Http\Controllers\Api\DatabasesController;
 use App\Http\Controllers\Api\DeployController;
+use App\Http\Controllers\Api\DeploymentFreezesController;
 use App\Http\Controllers\Api\DestinationsController;
 use App\Http\Controllers\Api\DigitalOceanController;
 use App\Http\Controllers\Api\GithubController;
@@ -164,6 +165,10 @@ Route::group([
     Route::get('/releases/{uuid}', [ReleasesController::class, 'release_by_uuid'])->middleware(['api.ability:read']);
     Route::post('/releases/{uuid}/cancel', [ReleasesController::class, 'cancel'])->middleware(['api.ability:deploy']);
     Route::post('/releases/{uuid}/resume', [ReleasesController::class, 'resume'])->middleware(['api.ability:deploy']);
+    Route::get('/deployment-freezes', [DeploymentFreezesController::class, 'index'])->middleware(['api.ability:read']);
+    Route::post('/deployment-freezes', [DeploymentFreezesController::class, 'store'])->middleware(['api.ability:write']);
+    Route::post('/deployment-freezes/{uuid}/end', [DeploymentFreezesController::class, 'end'])->middleware(['api.ability:write']);
+    Route::get('/servers/{uuid}/build-capacity', [ReleasesController::class, 'build_capacity'])->middleware(['api.ability:read']);
 
     Route::get('/servers', [ServersController::class, 'servers'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}', [ServersController::class, 'server_by_uuid'])->middleware(['api.ability:read']);

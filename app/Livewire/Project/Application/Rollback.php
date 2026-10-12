@@ -68,6 +68,11 @@ class Rollback extends Component
 
             return;
         }
+        if ($result['status'] === 'skipped') {
+            $this->dispatch('error', 'Rollback not started', $result['message']);
+
+            return;
+        }
 
         return redirectRoute($this, 'project.application.deployment.show', [
             'project_uuid' => $this->parameters['project_uuid'],

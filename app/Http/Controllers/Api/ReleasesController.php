@@ -11,6 +11,8 @@ use App\Models\Release;
 use App\Models\ReleaseGroup;
 use App\Models\ReleaseGroupMember;
 use App\Models\ReleaseMember;
+use App\Models\Server;
+use App\Services\Deployment\BuildCapacity;
 use App\Services\Release\ReleaseRefused;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -153,6 +155,8 @@ class ReleasesController extends Controller
         requestBody: new OA\RequestBody(required: false, content: new OA\JsonContent(type: 'object', properties: [
             new OA\Property(property: 'commit', type: 'string', description: 'Commit SHA, branch or tag for every application that builds from Git.'),
             new OA\Property(property: 'notes', type: 'string', maxLength: 2000),
+            new OA\Property(property: 'acknowledged_checks', type: 'array', items: new OA\Items(type: 'string', enum: ['deployment_freeze', 'release_window', 'backup_freshness']), description: 'Checks to override if they fail. Requires acknowledgement_reason; every override is audited.'),
+            new OA\Property(property: 'acknowledgement_reason', type: 'string', maxLength: 500),
         ])),
         responses: [
             new OA\Response(response: 201, description: 'Release created.', content: new OA\JsonContent(ref: '#/components/schemas/Release')),
@@ -172,6 +176,9 @@ class ReleasesController extends Controller
         $validator = Validator::make($request->all(), [
             'commit' => 'nullable|string|max:255',
             'notes' => 'nullable|string|max:2000',
+            'acknowledged_checks' => 'nullable|array',
+            'acknowledged_checks.*' => 'string|in:'.implode(',', CreateRelease::OVERRIDABLE_CHECKS),
+            'acknowledgement_reason' => 'nullable|string|max:500|required_with:acknowledged_checks',
         ]);
         if ($validator->fails()) {
             return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
@@ -184,7 +191,7 @@ class ReleasesController extends Controller
         $key = $request->header('Idempotency-Key');
         $existed = filled($key) && $group->releases()->where('idempotency_key', trim((string) $key))->exists();
         try {
-            $release = CreateRelease::run($group, Release::TRIGGER_API, $request->user(), $request->input('commit'), $request->input('notes'), $key);
+            $release = CreateRelease::run($group, Release::TRIGGER_API, $request->user(), $request->input('commit'), $request->input('notes'), $key, null, $request->input('acknowledged_checks', []), $request->input('acknowledgement_reason'));
         } catch (ReleaseRefused $e) {
             return response()->json(['message' => $e->getMessage()], 409);
         }
@@ -230,14 +237,16 @@ class ReleasesController extends Controller
 
     #[OA\Post(
         summary: 'Continue release',
-        description: 'Continue a paused release: retry the failed resources, or continue without them.',
+        description: 'Continue a paused release: retry the failed resources, continue without them, or override failed checks before the first deployment (with a reason, audited).',
         path: '/releases/{uuid}/resume',
         operationId: 'resume-release',
         security: [['bearerAuth' => []]],
         tags: ['Releases'],
         parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
         requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(type: 'object', required: ['mode'], properties: [
-            new OA\Property(property: 'mode', type: 'string', enum: ['retry', 'continue']),
+            new OA\Property(property: 'mode', type: 'string', enum: ['retry', 'continue', 'override']),
+            new OA\Property(property: 'acknowledged_checks', type: 'array', items: new OA\Items(type: 'string'), description: 'For override: the failed checks to override.'),
+            new OA\Property(property: 'reason', type: 'string', maxLength: 500, description: 'For override: why the checks are overridden.'),
         ])),
         responses: [
             new OA\Response(response: 200, description: 'Release continues.', content: new OA\JsonContent(ref: '#/components/schemas/Release')),
@@ -253,7 +262,12 @@ class ReleasesController extends Controller
         if (is_null($teamId)) {
             return invalidTokenResponse();
         }
-        $validator = Validator::make($request->all(), ['mode' => 'required|in:retry,continue']);
+        $validator = Validator::make($request->all(), [
+            'mode' => 'required|in:retry,continue,override',
+            'acknowledged_checks' => 'nullable|array|required_if:mode,override',
+            'acknowledged_checks.*' => 'string|max:64',
+            'reason' => 'nullable|string|max:500|required_if:mode,override',
+        ]);
         if ($validator->fails()) {
             return response()->json(['message' => 'Validation failed.', 'errors' => $validator->errors()], 422);
         }
@@ -262,13 +276,51 @@ class ReleasesController extends Controller
             return response()->json(['message' => 'Release not found.'], 404);
         }
         try {
-            $release = ResumeRelease::run($release, (string) $request->input('mode'), $request->user(), 'api');
+            $release = ResumeRelease::run($release, (string) $request->input('mode'), $request->user(), 'api', $request->input('acknowledged_checks', []), $request->input('reason'));
         } catch (ReleaseRefused $e) {
             return response()->json(['message' => $e->getMessage()], 409);
         }
         $release->load(['members', 'group']);
 
         return response()->json($this->release($release, $this->applicationsFor($release->members)));
+    }
+
+    #[OA\Get(
+        summary: 'Build capacity of a server',
+        description: 'Deployment slots of a server: the limit, slots running a deployment, slots reserved for a deployment that waits for a worker, and the queue.',
+        path: '/servers/{uuid}/build-capacity',
+        operationId: 'get-server-build-capacity',
+        security: [['bearerAuth' => []]],
+        tags: ['Releases'],
+        parameters: [new OA\Parameter(name: 'uuid', in: 'path', required: true, schema: new OA\Schema(type: 'string'))],
+        responses: [
+            new OA\Response(response: 200, description: 'Build capacity.', content: new OA\JsonContent(type: 'object', properties: [
+                new OA\Property(property: 'server_uuid', type: 'string'),
+                new OA\Property(property: 'server_name', type: 'string'),
+                new OA\Property(property: 'concurrent_builds', type: 'integer'),
+                new OA\Property(property: 'running', type: 'integer'),
+                new OA\Property(property: 'reserved', type: 'integer'),
+                new OA\Property(property: 'free_slots', type: 'integer'),
+                new OA\Property(property: 'queued', type: 'integer'),
+                new OA\Property(property: 'queue_limit', type: 'integer'),
+                new OA\Property(property: 'oldest_queued_seconds', type: 'integer', nullable: true),
+            ])),
+            new OA\Response(response: 401, ref: '#/components/responses/401'),
+            new OA\Response(response: 404, ref: '#/components/responses/404'),
+        ]
+    )]
+    public function build_capacity(Request $request): JsonResponse
+    {
+        $teamId = getTeamIdFromToken();
+        if (is_null($teamId)) {
+            return invalidTokenResponse();
+        }
+        $server = Server::query()->where('team_id', $teamId)->where('uuid', $request->route('uuid'))->first();
+        if ($server === null) {
+            return response()->json(['message' => 'Server not found.'], 404);
+        }
+
+        return response()->json(BuildCapacity::forServer($server)->toArray());
     }
 
     private function findGroup(int $teamId, string $uuid): ?ReleaseGroup
@@ -348,6 +400,8 @@ class ReleasesController extends Controller
             'failure_summary' => $release->failure_summary,
             'attention_reason' => $release->attention_reason,
             'preflight' => $release->preflight ?? [],
+            'acknowledged_checks' => $release->acknowledgedChecks(),
+            'acknowledgement_reason' => $release->acknowledgement_reason,
             'summary' => $release->summary,
             'created_at' => $release->created_at?->toIso8601String(),
             'started_at' => $release->started_at?->toIso8601String(),

@@ -25,6 +25,14 @@
                                 <time class="font-mono text-neutral-800 dark:text-fg" datetime="{{ $timelineTime->toIso8601String() }}">{{ $timelineTime->format('H:i:s') }}</time></span>
                         @endforeach
                     </div>
+                    @if ($executionSummary['images'] !== [])
+                        <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-neutral-600 dark:text-fg-dim" aria-label="Deployed images">
+                            <span>Deployed images</span>
+                            @foreach ($executionSummary['images'] as $image)
+                                <span class="min-w-0 truncate font-mono">@if ($image['service'] ?? null){{ $image['service'] }}: @endif{{ $image['image'] ?? '' }} {{ \Illuminate\Support\Str::limit((string) ($image['repo_digest'] ?? $image['image_id'] ?? ''), 19, '') }}</span>
+                            @endforeach
+                        </div>
+                    @endif
 
                     <div x-data="{
         fullscreen: @entangle('fullscreen'),

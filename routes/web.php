@@ -9,6 +9,7 @@ use App\Livewire\Admin\Index as AdminIndex;
 use App\Livewire\Analytics;
 use App\Livewire\Boarding\Index as BoardingIndex;
 use App\Livewire\Dashboard;
+use App\Livewire\DeploymentFreezes\Index as DeploymentFreezesIndex;
 use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
@@ -287,6 +288,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
     });
+    Route::get('/deployment-freezes', DeploymentFreezesIndex::class)->name('deployment-freezes.index');
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/releases')->group(function () {
         Route::get('/', ReleaseGroupIndex::class)->name('project.release-group.index');
         Route::get('/{release_group_uuid}', ReleaseGroupShow::class)->name('project.release-group.show');

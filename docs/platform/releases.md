@@ -23,7 +23,7 @@ Open it from an environment: **Releases** next to *Shared variables*.
 
 Only one release of a group runs at a time. Starting needs admin rights in the team and the deploy permission on every application of the group.
 
-Before the first deployment the release runs its checks: every resource still exists in the environment, phases and dependencies are consistent, every target server is reachable and usable. Warnings (another running release with the same applications, nearly full deployment queues) are shown but do not block. A failed check pauses the release with the reason; **Check again** re-runs the checks.
+Before the first deployment the release runs its checks: every resource still exists in the environment, phases and dependencies are consistent, every target server is reachable and usable, no deployment freeze is active, and, if the group asks for it, the release window and database backup age are met ([deployment-controls.md](deployment-controls.md)). Warnings (another running release with the same applications, nearly full deployment queues) are shown but do not block. A failed check pauses the release with the reason; **Check again** re-runs the checks, and failed checks that allow it can be overridden with an audited reason.
 
 ## What happens while it runs
 
@@ -57,13 +57,15 @@ All endpoints are team-scoped and documented in the OpenAPI specification under 
 | POST | `/api/v1/release-groups/{uuid}/releases` | deploy |
 | GET | `/api/v1/releases/{uuid}` | read |
 | POST | `/api/v1/releases/{uuid}/cancel` | deploy |
-| POST | `/api/v1/releases/{uuid}/resume` (`mode`: `retry` or `continue`) | deploy |
+| POST | `/api/v1/releases/{uuid}/resume` (`mode`: `retry`, `continue` or `override` with `acknowledged_checks` and `reason`) | deploy |
+| GET | `/api/v1/servers/{uuid}/build-capacity` | read |
+| GET, POST | `/api/v1/deployment-freezes`, `/api/v1/deployment-freezes/{uuid}/end` | read, write |
 
 `POST /release-groups/{uuid}/releases` accepts an `Idempotency-Key` header. A repeated request with the same key returns the release of the first request (HTTP 200 instead of 201) and starts nothing. Without a key, a second request while a release runs is answered with 409.
 
 ## Audit events
 
-`ui|api.release.created`, `system.release.started`, `system.release.blocked`, `system.release.paused`, `ui|api.release.resumed`, `ui|api.release.cancelled`, `system.release.finished`, and `ui.release_group.*` for changes to a group. Every release carries a `correlation_id` that appears in its audit events.
+`ui|api.release.created`, `system.release.started`, `release.checks_overridden`, `system.release.blocked`, `system.release.paused`, `ui|api.release.resumed`, `ui|api.release.cancelled`, `system.release.finished`, and `ui.release_group.*` for changes to a group. Every release carries a `correlation_id` that appears in its audit events.
 
 ## Source map
 

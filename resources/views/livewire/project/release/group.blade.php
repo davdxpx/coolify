@@ -152,6 +152,24 @@
                             <x-forms.checkbox id="isEnabled" label="Group enabled" :disabled="auth()->user()->cannot('update', $group)" />
                         </div>
                     </div>
+                    <h4 class="mt-6 mb-2 text-sm font-semibold">Checks before a release</h4>
+                    <p class="mb-3 text-[12px] text-neutral-500 dark:text-fg-dim">A failed check pauses the release before the first deployment. Admins can override it with a reason that is audited. Active deployment freezes are always checked.</p>
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <x-forms.input type="number" min="1" max="720" id="backupMaxAgeHours" label="Required database backup age (hours)"
+                            canGate="update" :canResource="$group"
+                            helper="Empty: not checked. Otherwise every database of the environment needs a successful backup that is not older." />
+                        <div class="pt-6">
+                            <x-forms.checkbox id="windowEnabled" live label="Only release inside a release window" :disabled="auth()->user()->cannot('update', $group)" />
+                        </div>
+                        @if ($windowEnabled)
+                            <x-forms.listbox multiple id="windowDays" label="Days" canGate="update" :canResource="$group"
+                                :options="collect(range(1, 7))->map(fn ($day) => ['value' => (string) $day, 'label' => \Illuminate\Support\Carbon::create(2024, 1, $day)->format('l')])->all()" />
+                            <x-forms.listbox id="windowTimezone" label="Time zone" searchable canGate="update" :canResource="$group"
+                                :options="collect(timezone_identifiers_list())->map(fn ($zone) => ['value' => $zone, 'label' => $zone])->all()" />
+                            <x-forms.input type="time" id="windowStart" label="From" canGate="update" :canResource="$group" />
+                            <x-forms.input type="time" id="windowEnd" label="Until" canGate="update" :canResource="$group" />
+                        @endif
+                    </div>
                     @can('update', $group)
                         <div class="mt-4">
                             <x-forms.button type="submit">Save settings</x-forms.button>

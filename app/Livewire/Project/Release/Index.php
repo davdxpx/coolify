@@ -2,9 +2,14 @@
 
 namespace App\Livewire\Project\Release;
 
+use App\Models\Application;
+use App\Models\DeploymentFreeze;
 use App\Models\Environment;
 use App\Models\Project;
 use App\Models\ReleaseGroup;
+use App\Models\Server;
+use App\Models\StandaloneDocker;
+use App\Services\Deployment\BuildCapacity;
 use App\Support\ValidationPatterns;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Attributes\Locked;
@@ -79,6 +84,20 @@ class Index extends Component
             ->orderBy('name')
             ->get();
 
-        return view('livewire.project.release.index', ['groups' => $groups]);
+        $servers = Server::query()
+            ->whereIn('id', StandaloneDocker::query()->whereIn('id', Application::query()->where('environment_id', $this->environment->id)->where('destination_type', StandaloneDocker::class)->pluck('destination_id'))->pluck('server_id'))
+            ->with('settings')
+            ->get();
+        $freezes = DeploymentFreeze::query()
+            ->upcomingOrActive()
+            ->covering((int) currentTeam()->id, (int) $this->project->id, (int) $this->environment->id)
+            ->orderBy('starts_at')
+            ->get();
+
+        return view('livewire.project.release.index', [
+            'groups' => $groups,
+            'capacities' => $servers->map(fn (Server $server) => BuildCapacity::forServer($server)),
+            'freezes' => $freezes,
+        ]);
     }
 }

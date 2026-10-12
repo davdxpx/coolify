@@ -2,13 +2,17 @@
 
 namespace App\Services\Release;
 
-use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\PreflightState;
 use App\Models\Application;
-use App\Models\ApplicationDeploymentQueue;
+use App\Models\DeploymentFreeze;
 use App\Models\Release;
 use App\Models\ReleaseMember;
+use App\Services\Backup\BackupFreshness;
+use App\Services\Deployment\BuildCapacity;
+use App\Services\Deployment\DeploymentFreezeGuard;
 use App\Services\Preflight\PreflightResult;
+use Carbon\CarbonInterface;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 class ReleasePreflight
@@ -26,13 +30,89 @@ class ReleasePreflight
             ->get()
             ->keyBy('id');
 
-        return [
+        $policy = (array) ($release->group->preflight_policy ?? []);
+
+        return array_values(array_filter([
             $this->resources($release, $members, $applications),
             $this->dependencies($members),
             $this->servers($members, $applications),
+            $this->deploymentFreeze($applications),
+            isset($policy['release_window']) ? $this->releaseWindow((array) $policy['release_window']) : null,
+            isset($policy['backup_max_age_hours']) ? $this->backups($release, (int) $policy['backup_max_age_hours']) : null,
             $this->overlappingReleases($release, $members),
             $this->deploymentQueues($applications),
-        ];
+        ]));
+    }
+
+    /**
+     * @param  Collection<int, Application>  $applications
+     */
+    private function deploymentFreeze(Collection $applications): PreflightResult
+    {
+        $guard = app(DeploymentFreezeGuard::class);
+        $freezes = $applications->map(fn (Application $application) => $guard->activeFreezeFor($application))->filter()->unique('id');
+        if ($freezes->isEmpty()) {
+            return new PreflightResult(id: 'deployment_freeze', label: 'Deployment freeze', state: PreflightState::PASSED, summary: 'No deployment freeze is active.', category: 'policy');
+        }
+
+        return new PreflightResult(
+            id: 'deployment_freeze',
+            label: 'Deployment freeze',
+            state: PreflightState::FAILED,
+            summary: $freezes->map(fn (DeploymentFreeze $freeze) => $freeze->describe())->implode(' '),
+            overridable: $freezes->every(fn (DeploymentFreeze $freeze) => $freeze->allow_override),
+            remediation: 'Wait until the freeze ends, or continue with an audited reason if the freeze allows it.',
+            details: ['freezes' => $freezes->pluck('uuid')->implode(',')],
+            category: 'policy',
+        );
+    }
+
+    /**
+     * @param  array{days?: list<int>, start?: string, end?: string, timezone?: string}  $window
+     */
+    public function releaseWindow(array $window, ?CarbonInterface $at = null): PreflightResult
+    {
+        $timezone = in_array($window['timezone'] ?? 'UTC', timezone_identifiers_list(), true) ? $window['timezone'] : 'UTC';
+        $now = ($at ?? now())->copy()->setTimezone($timezone);
+        $days = array_map('intval', (array) ($window['days'] ?? [1, 2, 3, 4, 5]));
+        $start = (string) ($window['start'] ?? '00:00');
+        $end = (string) ($window['end'] ?? '23:59');
+        $time = $now->format('H:i');
+        $inside = in_array((int) $now->format('N'), $days, true) && $time >= $start && $time <= $end;
+        $dayNames = collect($days)->sort()->map(fn (int $day) => Carbon::create(2024, 1, $day)->format('D'))->implode(', ');
+
+        return new PreflightResult(
+            id: 'release_window',
+            label: 'Release window',
+            state: $inside ? PreflightState::PASSED : PreflightState::FAILED,
+            summary: ($inside ? 'Inside the release window' : 'Outside the release window')." ({$dayNames}, {$start} to {$end} {$timezone}).",
+            overridable: true,
+            remediation: $inside ? null : 'Start the release inside the window, or continue with an audited reason.',
+            category: 'policy',
+        );
+    }
+
+    private function backups(Release $release, int $maxAgeHours): PreflightResult
+    {
+        $statuses = app(BackupFreshness::class)->forEnvironment($release->group->environment);
+        $problems = [];
+        foreach ($statuses as $status) {
+            if (! $status['configured']) {
+                $problems[] = "{$status['database_name']} has no enabled backup schedule.";
+            } elseif ($status['age_hours'] === null || $status['age_hours'] > $maxAgeHours) {
+                $problems[] = "{$status['database_name']} has no successful backup in the last {$maxAgeHours} hours.";
+            }
+        }
+
+        return new PreflightResult(
+            id: 'backup_freshness',
+            label: 'Database backups',
+            state: $problems === [] ? PreflightState::PASSED : PreflightState::FAILED,
+            summary: $problems === [] ? ($statuses === [] ? 'The environment has no databases.' : "Every database has a successful backup from the last {$maxAgeHours} hours.") : implode(' ', $problems),
+            overridable: true,
+            remediation: $problems === [] ? null : 'Run a backup of the listed databases, or continue with an audited reason.',
+            category: 'policy',
+        );
     }
 
     /**
@@ -141,13 +221,9 @@ class ReleasePreflight
     {
         $busy = [];
         foreach ($applications->map(fn (Application $application) => $application->destination?->server)->filter()->unique('id') as $server) {
-            $limit = (int) ($server->settings->deployment_queue_limit ?? 25);
-            $queued = ApplicationDeploymentQueue::query()
-                ->where('server_id', $server->id)
-                ->where('status', ApplicationDeploymentStatus::QUEUED->value)
-                ->count();
-            if ($queued >= max(1, $limit - 2)) {
-                $busy[] = "{$server->name} ({$queued} of {$limit} queued)";
+            $capacity = BuildCapacity::forServer($server);
+            if ($capacity->queueAlmostFull()) {
+                $busy[] = "{$server->name} ({$capacity->queued} of {$capacity->queueLimit} queued)";
             }
         }
 

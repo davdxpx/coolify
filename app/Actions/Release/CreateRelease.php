@@ -23,7 +23,15 @@ class CreateRelease
 {
     use AsAction;
 
-    public function handle(ReleaseGroup $group, string $trigger, ?User $user = null, ?string $commit = null, ?string $notes = null, ?string $idempotencyKey = null, ?Release $source = null): Release
+    /**
+     * Checks that may be acknowledged up front, for example by a pipeline that releases a hotfix during a freeze.
+     */
+    public const OVERRIDABLE_CHECKS = ['deployment_freeze', 'release_window', 'backup_freshness'];
+
+    /**
+     * @param  list<string>  $acknowledged
+     */
+    public function handle(ReleaseGroup $group, string $trigger, ?User $user = null, ?string $commit = null, ?string $notes = null, ?string $idempotencyKey = null, ?Release $source = null, array $acknowledged = [], ?string $acknowledgementReason = null): Release
     {
         if ($user !== null) {
             $decision = Gate::forUser($user)->inspect('release', $group);
@@ -37,6 +45,12 @@ class CreateRelease
             return $existing;
         }
 
+        $acknowledged = array_values(array_intersect(self::OVERRIDABLE_CHECKS, $acknowledged));
+        $acknowledgementReason = filled($acknowledgementReason) ? Str::limit(trim($acknowledgementReason), 500, '') : null;
+        if ($acknowledged !== [] && $acknowledgementReason === null) {
+            throw new ReleaseRefused('Overriding a check requires a reason.');
+        }
+
         $commit = filled($commit) ? trim($commit) : null;
         if ($commit !== null) {
             try {
@@ -47,7 +61,7 @@ class CreateRelease
         }
 
         try {
-            $release = DB::transaction(fn () => $this->create($group, $trigger, $user, $commit, $notes, $idempotencyKey, $source));
+            $release = DB::transaction(fn () => $this->create($group, $trigger, $user, $commit, $notes, $idempotencyKey, $source, $acknowledged, $acknowledgementReason));
         } catch (UniqueConstraintViolationException $e) {
             if ($idempotencyKey !== null && ($existing = $this->existing($group, $idempotencyKey)) !== null) {
                 return $existing;
@@ -62,6 +76,7 @@ class CreateRelease
             'correlation_id' => $release->correlation_id,
             'requested_commit' => $commit,
             'members' => $release->members()->count(),
+            'acknowledged_checks' => $acknowledged,
         ]);
 
         ProcessReleaseJob::dispatch($release->id);
@@ -74,7 +89,10 @@ class CreateRelease
         return Release::query()->where('release_group_id', $group->id)->where('idempotency_key', $idempotencyKey)->first();
     }
 
-    private function create(ReleaseGroup $group, string $trigger, ?User $user, ?string $commit, ?string $notes, ?string $idempotencyKey, ?Release $source): Release
+    /**
+     * @param  list<string>  $acknowledged
+     */
+    private function create(ReleaseGroup $group, string $trigger, ?User $user, ?string $commit, ?string $notes, ?string $idempotencyKey, ?Release $source, array $acknowledged, ?string $acknowledgementReason): Release
     {
         $group = ReleaseGroup::query()->whereKey($group->id)->lockForUpdate()->firstOrFail();
 
@@ -113,6 +131,8 @@ class CreateRelease
             'notes' => filled($notes) ? Str::limit(trim($notes), 2000, '') : null,
             'requested_by_user_id' => $user?->id,
             'source_release_id' => $source?->id,
+            'acknowledged_checks' => $acknowledged,
+            'acknowledgement_reason' => $acknowledgementReason,
             'policy_snapshot' => [
                 'failure_policy' => $group->failure_policy->value,
                 'max_parallel' => $group->max_parallel,

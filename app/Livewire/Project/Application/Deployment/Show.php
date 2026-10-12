@@ -168,7 +168,7 @@ class Show extends Component
                 : "Waiting for a deployment slot: {$busy} of ".($server?->settings?->concurrent_builds ?? '?').' slots on '.($server?->name ?? 'the server').' are in use.';
         }
 
-        return ['state' => $deployment->displayState(), 'timeline' => $timeline, 'blocking' => $blocking];
+        return ['state' => $deployment->displayState(), 'timeline' => $timeline, 'blocking' => $blocking, 'images' => (array) data_get($deployment->artifacts, 'images', [])];
     }
 
     public function render()

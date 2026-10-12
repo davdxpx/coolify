@@ -46,6 +46,7 @@ use OpenApi\Attributes as OA;
         'commit_message' => ['type' => 'string'],
         'phase' => ['type' => 'string', 'nullable' => true, 'enum' => ['queued', 'admitted', 'dispatched', 'preparing', 'building', 'pushing', 'deploying', 'verifying', 'finished', 'failed', 'cancelled'], 'description' => 'Execution phase. Null for deployments created before phases were recorded. The status field keeps its previous meaning: in_progress means a deployment slot is reserved.'],
         'phase_changed_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+        'artifacts' => ['type' => 'object', 'nullable' => true, 'description' => 'Images the finished deployment runs: per container the image, its local image id and, when known, its registry digest.'],
         'phase_history' => ['type' => 'array', 'nullable' => true, 'items' => ['type' => 'object', 'properties' => ['phase' => ['type' => 'string'], 'at' => ['type' => 'string', 'format' => 'date-time']]]],
         'admitted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'When a deployment slot was reserved.'],
         'dispatched_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'When the job was handed to the queue.'],
@@ -148,6 +149,7 @@ class ApplicationDeploymentQueue extends Model
         'admitted_at',
         'dispatched_at',
         'started_at',
+        'artifacts',
     ];
 
     /**
@@ -170,6 +172,7 @@ class ApplicationDeploymentQueue extends Model
         'phase' => DeploymentPhase::class,
         'phase_changed_at' => 'datetime',
         'phase_history' => 'array',
+        'artifacts' => 'array',
         'admitted_at' => 'datetime',
         'dispatched_at' => 'datetime',
         'started_at' => 'datetime',

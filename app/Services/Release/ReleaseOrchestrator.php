@@ -10,6 +10,7 @@ use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Release;
 use App\Models\ReleaseMember;
+use App\Services\Deployment\DeploymentArtifacts;
 use App\Services\Preflight\PreflightResult;
 use Illuminate\Contracts\Cache\Lock;
 use Illuminate\Support\Collection;
@@ -83,7 +84,8 @@ class ReleaseOrchestrator
     {
         $release->update(['state' => ReleaseState::VALIDATING]);
         $results = $this->preflight->run($release);
-        $blocking = PreflightResult::blocking($results);
+        $acknowledged = $release->acknowledgedChecks();
+        $blocking = PreflightResult::blocking($results, $acknowledged);
 
         if ($blocking !== []) {
             $release->update([
@@ -96,13 +98,18 @@ class ReleaseOrchestrator
             return false;
         }
 
+        $overridden = array_values(array_map(fn (PreflightResult $result) => $result->id, array_filter($results, fn (PreflightResult $result) => $result->blocks() && in_array($result->id, $acknowledged, true))));
         $release->update([
             'state' => ReleaseState::RUNNING,
             'preflight' => array_map(fn (PreflightResult $result) => $result->toArray(), $results),
+            'acknowledged_checks' => $overridden,
             'attention_reason' => null,
             'validated_at' => now(),
             'started_at' => $release->started_at ?? now(),
         ]);
+        if ($overridden !== []) {
+            $this->audit('release.checks_overridden', $release, ['checks' => $overridden, 'reason' => $release->acknowledgement_reason], 'warning');
+        }
         $this->audit('system.release.started', $release);
 
         return true;
@@ -231,6 +238,7 @@ class ReleaseOrchestrator
                 deployment_uuid: $deploymentUuid,
                 commit: $member->requested_commit,
                 force_rebuild: $member->force_rebuild,
+                freeze_override_reason: in_array('deployment_freeze', $release->acknowledgedChecks(), true) ? $release->acknowledgement_reason : null,
             );
         } catch (Throwable $e) {
             Log::warning("Release {$release->uuid} could not queue {$member->resource_name}: {$e->getMessage()}");
@@ -296,6 +304,7 @@ class ReleaseOrchestrator
         $member->fill([
             'deployment_status' => $deployment->status,
             'actual_commit' => $deployment->commit,
+            'image_digest' => DeploymentArtifacts::primaryDigest($deployment->artifacts) ?? $member->image_digest,
         ]);
 
         match ($deployment->status) {

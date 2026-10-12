@@ -22,6 +22,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\Deployment\DeploymentArtifacts;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -6034,7 +6035,25 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
      */
     private function completeDeployment(): void
     {
+        $this->recordArtifacts();
         $this->transitionToStatus(ApplicationDeploymentStatus::FINISHED);
+    }
+
+    /**
+     * Records the images the deployment runs before it is reported as finished, so releases and
+     * rollbacks can read them right away. Never fails the deployment.
+     */
+    private function recordArtifacts(): void
+    {
+        if ($this->pull_request_id !== 0 || $this->server->isSwarm() || ! $this->server->isFunctional()) {
+            return;
+        }
+
+        try {
+            app(DeploymentArtifacts::class)->capture($this->application_deployment_queue, $this->application, $this->server);
+        } catch (Throwable $e) {
+            $this->logStatusTransitionSideEffectFailure('Recording the deployed images failed', $e);
+        }
     }
 
     /**

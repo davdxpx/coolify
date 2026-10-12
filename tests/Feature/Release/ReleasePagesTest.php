@@ -154,3 +154,31 @@ it('lets a member view but not change or start a release group', function () {
     expect($group->fresh()->name)->toBe('Web stack')
         ->and(Release::count())->toBe(0);
 });
+
+it('stores the release window and backup age as release checks', function () {
+    $group = ReleaseGroup::create(['team_id' => $this->team->id, 'environment_id' => $this->environment->id, 'name' => 'Web stack']);
+
+    Livewire::test(Group::class, [...$this->route, 'release_group_uuid' => $group->uuid])
+        ->set('windowEnabled', true)
+        ->set('windowDays', ['2', '3'])
+        ->set('windowStart', '08:00')
+        ->set('windowEnd', '16:30')
+        ->set('windowTimezone', 'Europe/Berlin')
+        ->set('backupMaxAgeHours', 12)
+        ->call('saveSettings')
+        ->assertDispatched('success');
+
+    expect($group->fresh()->preflight_policy)->toBe([
+        'release_window' => ['days' => [2, 3], 'start' => '08:00', 'end' => '16:30', 'timezone' => 'Europe/Berlin'],
+        'backup_max_age_hours' => 12,
+    ]);
+
+    Livewire::test(Group::class, [...$this->route, 'release_group_uuid' => $group->uuid])
+        ->assertSet('windowEnabled', true)
+        ->assertSet('windowTimezone', 'Europe/Berlin')
+        ->set('windowEnabled', false)
+        ->set('backupMaxAgeHours', null)
+        ->call('saveSettings');
+
+    expect($group->fresh()->preflight_policy)->toBeNull();
+});

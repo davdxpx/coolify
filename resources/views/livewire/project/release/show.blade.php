@@ -56,6 +56,32 @@
                 <x-callout type="warning" title="The release is paused">
                     <p>{{ $release->attention_reason }}</p>
                 </x-callout>
+                @php
+                    $overridable = collect($preflight)->filter(fn ($check) => $check->blocks() && $check->overridable);
+                @endphp
+                @if ($release->validated_at === null && $overridable->isNotEmpty())
+                    @can('release', $group)
+                        <form wire:submit="override">
+                            <x-application.settings-section title="Override failed checks"
+                                helper="The release continues although these checks failed. The reason is stored with the release and in the audit log.">
+                                <div class="flex flex-col gap-3">
+                                    @foreach ($overridable as $check)
+                                        <x-forms.checkbox id="overrideCheck-{{ $check->id }}" domValue="{{ $check->id }}" wire:model="overrideChecks" :label="$check->label.': '.e($check->summary)" />
+                                    @endforeach
+                                    <x-forms.input id="overrideReason" label="Reason" required placeholder="Security fix approved by the on-call engineer" />
+                                    <div>
+                                        <x-forms.button type="submit" isError>Override and continue</x-forms.button>
+                                    </div>
+                                </div>
+                            </x-application.settings-section>
+                        </form>
+                    @endcan
+                @endif
+            @endif
+            @if ($release->acknowledgedChecks() !== [])
+                <x-callout type="warning" title="Checks were overridden">
+                    <p>{{ collect($release->acknowledgedChecks())->implode(', ') }}: {{ $release->acknowledgement_reason }}</p>
+                </x-callout>
             @endif
             @if ($release->state->isTerminal() && $release->failure_summary)
                 <x-callout :type="$release->state === \App\Enums\ReleaseState::CANCELLED ? 'info' : 'danger'" title="Not every resource succeeded">

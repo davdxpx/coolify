@@ -27,6 +27,11 @@ class Show extends Component
     #[Locked]
     public Release $release;
 
+    /** @var list<string> */
+    public array $overrideChecks = [];
+
+    public string $overrideReason = '';
+
     public function mount(string $project_uuid, string $environment_uuid, string $release_group_uuid, string $release_uuid)
     {
         try {
@@ -56,6 +61,17 @@ class Show extends Component
     {
         try {
             $this->release = ResumeRelease::run($this->release, $mode, auth()->user());
+        } catch (\Throwable $e) {
+            return handleError($e, $this);
+        }
+    }
+
+    public function override()
+    {
+        try {
+            $this->validate(['overrideChecks' => 'required|array|min:1', 'overrideChecks.*' => 'string', 'overrideReason' => 'required|string|max:500']);
+            $this->release = ResumeRelease::run($this->release, ResumeRelease::OVERRIDE, auth()->user(), 'ui', $this->overrideChecks, $this->overrideReason);
+            $this->reset('overrideChecks', 'overrideReason');
         } catch (\Throwable $e) {
             return handleError($e, $this);
         }

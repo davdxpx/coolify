@@ -3183,6 +3183,20 @@ input[type="search"]::-webkit-search-results-decoration {
     min-width: 58rem;
 }
 
+.deployment-freezes-table-grid {
+    grid-template-columns: minmax(11rem, 1.2fr) 14rem minmax(10rem, 1.6fr) minmax(10rem, 1.2fr) 9rem;
+    min-width: 58rem;
+}
+
+.deployment-freezes-past-table-grid {
+    grid-template-columns: minmax(11rem, 1fr) minmax(16rem, 1.6fr) minmax(10rem, 1.6fr);
+}
+
+.build-capacity-table-grid {
+    grid-template-columns: minmax(10rem, 1.4fr) 6rem 6rem 6rem 6rem minmax(8rem, 1fr);
+    min-width: 40rem;
+}
+
 .server-resources-unmanaged-table-grid {
     grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.5fr) 7rem minmax(9rem, auto);
 }

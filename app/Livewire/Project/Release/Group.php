@@ -47,6 +47,19 @@ class Group extends Component
 
     public int $verificationTimeoutSeconds = 600;
 
+    public bool $windowEnabled = false;
+
+    /** @var list<string> */
+    public array $windowDays = ['1', '2', '3', '4', '5'];
+
+    public string $windowStart = '09:00';
+
+    public string $windowEnd = '17:00';
+
+    public string $windowTimezone = 'UTC';
+
+    public ?int $backupMaxAgeHours = null;
+
     /** @var array<string, array{phase: int, is_required: bool, force_rebuild: bool, is_enabled: bool, depends_on: list<string>}> */
     public array $memberSettings = [];
 
@@ -83,6 +96,18 @@ class Group extends Component
         $this->maxParallel = $this->group->max_parallel;
         $this->requireHealthy = $this->group->require_healthy;
         $this->verificationTimeoutSeconds = $this->group->verification_timeout_seconds;
+        $policy = (array) ($this->group->preflight_policy ?? []);
+        $window = $policy['release_window'] ?? null;
+        $this->windowEnabled = is_array($window);
+        if (is_array($window)) {
+            $this->windowDays = array_map('strval', (array) ($window['days'] ?? []));
+            $this->windowStart = (string) ($window['start'] ?? '09:00');
+            $this->windowEnd = (string) ($window['end'] ?? '17:00');
+            $this->windowTimezone = (string) ($window['timezone'] ?? 'UTC');
+        } else {
+            $this->windowTimezone = instanceSettings()->instance_timezone ?: 'UTC';
+        }
+        $this->backupMaxAgeHours = isset($policy['backup_max_age_hours']) ? (int) $policy['backup_max_age_hours'] : null;
     }
 
     private function syncMembers(): void
@@ -110,7 +135,24 @@ class Group extends Component
                 'maxParallel' => 'required|integer|min:1|max:'.ReleaseGroup::MAX_PARALLEL_LIMIT,
                 'requireHealthy' => 'boolean',
                 'verificationTimeoutSeconds' => 'required|integer|min:60|max:7200',
+                'windowEnabled' => 'boolean',
+                'windowDays' => 'exclude_unless:windowEnabled,true|array|min:1',
+                'windowDays.*' => 'in:1,2,3,4,5,6,7',
+                'windowStart' => 'exclude_unless:windowEnabled,true|date_format:H:i',
+                'windowEnd' => 'exclude_unless:windowEnabled,true|date_format:H:i|after:windowStart',
+                'windowTimezone' => ['exclude_unless:windowEnabled,true', Rule::in(timezone_identifiers_list())],
+                'backupMaxAgeHours' => 'nullable|integer|min:1|max:720',
             ], ValidationPatterns::combinedMessages());
+
+            $policy = array_filter([
+                'release_window' => $this->windowEnabled ? [
+                    'days' => array_values(array_map('intval', $this->windowDays)),
+                    'start' => $this->windowStart,
+                    'end' => $this->windowEnd,
+                    'timezone' => $this->windowTimezone,
+                ] : null,
+                'backup_max_age_hours' => $this->backupMaxAgeHours,
+            ], fn ($value) => $value !== null);
 
             $this->group->update([
                 'name' => $this->name,
@@ -120,6 +162,7 @@ class Group extends Component
                 'max_parallel' => $this->maxParallel,
                 'require_healthy' => $this->requireHealthy,
                 'verification_timeout_seconds' => $this->verificationTimeoutSeconds,
+                'preflight_policy' => $policy === [] ? null : $policy,
             ]);
             auditLog('ui.release_group.updated', ['team_id' => $this->group->team_id, 'release_group_uuid' => $this->group->uuid]);
             $this->dispatch('success', 'Release group saved.');

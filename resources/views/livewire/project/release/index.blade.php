@@ -14,10 +14,19 @@
                     <x-reicon name="layers" class="size-3.5" />
                     Resources
                 </a>
+                <a href="{{ route('deployment-freezes.index') }}" {{ wireNavigate() }} class="button whitespace-nowrap">
+                    <x-reicon name="calendar" class="size-3.5" />
+                    Deployment freezes
+                </a>
             </div>
         </header>
 
         <div class="flex flex-col gap-6">
+            @foreach ($freezes as $freeze)
+                <x-callout :type="$freeze->isActive() ? 'danger' : 'warning'" :title="$freeze->isActive() ? 'Deployment freeze active' : 'Deployment freeze planned'">
+                    <p>{{ $freeze->describe() }}@unless ($freeze->isActive()) Starts {{ $freeze->starts_at->diffForHumans() }}.@endunless</p>
+                </x-callout>
+            @endforeach
             <x-application.settings-section title="Release groups" flush>
                 @if ($groups->isEmpty())
                     <div class="p-6">
@@ -60,6 +69,33 @@
                     </div>
                 @endif
             </x-application.settings-section>
+
+            @if ($capacities->isNotEmpty())
+                <x-application.settings-section title="Build slots" flush
+                    helper="Deployment slots of the servers this environment deploys to. A reserved slot belongs to a deployment that waits for a queue worker.">
+                    <div class="data-table overflow-x-auto">
+                        <div class="data-table-header build-capacity-table-grid">
+                            <span>Server</span>
+                            <span>Slots</span>
+                            <span>Running</span>
+                            <span>Reserved</span>
+                            <span>Queued</span>
+                            <span>Oldest in queue</span>
+                        </div>
+                        @foreach ($capacities as $capacity)
+                            <div wire:key="capacity-{{ $capacity->serverUuid }}"
+                                class="data-table-row build-capacity-table-grid border-b border-neutral-200 last:border-b-0 dark:border-white/[0.08]">
+                                <span class="min-w-0 truncate text-[13px] font-medium">{{ $capacity->serverName }}</span>
+                                <span class="text-[12px]">{{ $capacity->concurrentBuilds }}</span>
+                                <span class="text-[12px]">{{ $capacity->running }}</span>
+                                <span class="text-[12px]">{{ $capacity->reserved }}</span>
+                                <span class="text-[12px]">{{ $capacity->queued }} / {{ $capacity->queueLimit }}</span>
+                                <span class="text-[12px] text-neutral-600 dark:text-fg-dim">{{ $capacity->oldestQueuedSeconds === null ? 'Empty' : \Carbon\CarbonInterval::seconds($capacity->oldestQueuedSeconds)->cascade()->forHumans(['short' => true]) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                </x-application.settings-section>
+            @endif
 
             @can('create', \App\Models\ReleaseGroup::class)
                 <form wire:submit="create">
