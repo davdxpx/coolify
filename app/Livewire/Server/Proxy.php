@@ -177,6 +177,8 @@ class Proxy extends Component
 
     private function saveSettings(): void
     {
+        // Both callers authorize first; the check stays here so a future caller cannot skip it.
+        $this->authorize('update', $this->server);
         $this->syncData(true);
         $changedFields = auditChangedFields($this->server->settings);
         $this->server->settings->save();
