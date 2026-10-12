@@ -3245,7 +3245,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function reuse_commit_message(): void
     {
-        if (filled($this->application_deployment_queue->commit_message) || $this->shouldResolveBranchHeadCommit()) {
+        if (! $this->application_deployment_queue->exists || filled($this->application_deployment_queue->commit_message) || $this->shouldResolveBranchHeadCommit()) {
             return;
         }
 
