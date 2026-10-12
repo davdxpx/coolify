@@ -6,17 +6,14 @@ use App\Actions\Release\CancelRelease;
 use App\Actions\Release\CreateRelease;
 use App\Actions\Release\ResumeRelease;
 use App\Http\Controllers\Controller;
-use App\Models\Application;
 use App\Models\Release;
 use App\Models\ReleaseGroup;
-use App\Models\ReleaseGroupMember;
-use App\Models\ReleaseMember;
 use App\Models\Server;
 use App\Services\Deployment\BuildCapacity;
+use App\Services\Release\ReleasePresenter;
 use App\Services\Release\ReleaseRefused;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use OpenApi\Attributes as OA;
 
@@ -45,9 +42,9 @@ class ReleasesController extends Controller
             ->with(['environment.project', 'members', 'releases' => fn ($query) => $query->limit(1)])
             ->orderBy('name')
             ->get();
-        $applications = $this->applicationsFor($groups->flatMap->members);
+        $applications = ReleasePresenter::applicationsFor($groups->flatMap->members);
 
-        return response()->json($groups->map(fn (ReleaseGroup $group) => $this->group($group, $applications))->values());
+        return response()->json($groups->map(fn (ReleaseGroup $group) => ReleasePresenter::group($group, $applications))->values());
     }
 
     #[OA\Get(
@@ -76,7 +73,7 @@ class ReleasesController extends Controller
         }
         $group->load(['environment.project', 'members', 'releases' => fn ($query) => $query->limit(1)]);
 
-        return response()->json($this->group($group, $this->applicationsFor($group->members)));
+        return response()->json(ReleasePresenter::group($group, ReleasePresenter::applicationsFor($group->members)));
     }
 
     #[OA\Get(
@@ -108,9 +105,9 @@ class ReleasesController extends Controller
         }
         $limit = max(1, min(100, (int) $request->query('limit', 20)));
         $releases = $group->releases()->with(['members', 'group'])->limit($limit)->get();
-        $applications = $this->applicationsFor($releases->flatMap->members);
+        $applications = ReleasePresenter::applicationsFor($releases->flatMap->members);
 
-        return response()->json($releases->map(fn (Release $release) => $this->release($release, $applications))->values());
+        return response()->json($releases->map(fn (Release $release) => ReleasePresenter::release($release, $applications))->values());
     }
 
     #[OA\Get(
@@ -138,7 +135,7 @@ class ReleasesController extends Controller
             return response()->json(['message' => 'Release not found.'], 404);
         }
 
-        return response()->json($this->release($release, $this->applicationsFor($release->members)));
+        return response()->json(ReleasePresenter::release($release, ReleasePresenter::applicationsFor($release->members)));
     }
 
     #[OA\Post(
@@ -197,7 +194,7 @@ class ReleasesController extends Controller
         }
         $release->load(['members', 'group']);
 
-        return response()->json($this->release($release, $this->applicationsFor($release->members)), $existed ? 200 : 201);
+        return response()->json(ReleasePresenter::release($release, ReleasePresenter::applicationsFor($release->members)), $existed ? 200 : 201);
     }
 
     #[OA\Post(
@@ -232,7 +229,7 @@ class ReleasesController extends Controller
         }
         $release->load(['members', 'group']);
 
-        return response()->json($this->release($release, $this->applicationsFor($release->members)));
+        return response()->json(ReleasePresenter::release($release, ReleasePresenter::applicationsFor($release->members)));
     }
 
     #[OA\Post(
@@ -282,7 +279,7 @@ class ReleasesController extends Controller
         }
         $release->load(['members', 'group']);
 
-        return response()->json($this->release($release, $this->applicationsFor($release->members)));
+        return response()->json(ReleasePresenter::release($release, ReleasePresenter::applicationsFor($release->members)));
     }
 
     #[OA\Get(
@@ -331,103 +328,5 @@ class ReleasesController extends Controller
     private function findRelease(int $teamId, string $uuid): ?Release
     {
         return Release::query()->where('team_id', $teamId)->where('uuid', $uuid)->with(['members', 'group'])->first();
-    }
-
-    /**
-     * @param  iterable<ReleaseGroupMember|ReleaseMember>  $members
-     * @return Collection<int, Application>
-     */
-    private function applicationsFor(iterable $members)
-    {
-        $ids = collect($members)->where('resource_type', Application::class)->pluck('resource_id')->unique()->values();
-
-        return Application::query()->whereIn('id', $ids)->get(['id', 'uuid', 'name'])->keyBy('id');
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function group(ReleaseGroup $group, $applications): array
-    {
-        $latest = $group->releases->first();
-
-        return [
-            'uuid' => $group->uuid,
-            'name' => $group->name,
-            'description' => $group->description,
-            'project_uuid' => $group->environment?->project?->uuid,
-            'environment_uuid' => $group->environment?->uuid,
-            'environment_name' => $group->environment?->name,
-            'is_enabled' => $group->is_enabled,
-            'failure_policy' => $group->failure_policy->value,
-            'max_parallel' => $group->max_parallel,
-            'require_healthy' => $group->require_healthy,
-            'verification_timeout_seconds' => $group->verification_timeout_seconds,
-            'members' => $group->members->map(fn (ReleaseGroupMember $member) => [
-                'uuid' => $member->uuid,
-                'resource_type' => 'application',
-                'resource_uuid' => $applications->get($member->resource_id)?->uuid,
-                'resource_name' => $applications->get($member->resource_id)?->name,
-                'phase' => $member->phase,
-                'is_required' => $member->is_required,
-                'is_enabled' => $member->is_enabled,
-                'force_rebuild' => $member->force_rebuild,
-                'depends_on' => $member->dependencies(),
-            ])->values(),
-            'latest_release' => $latest ? [
-                'uuid' => $latest->uuid,
-                'state' => $latest->state->value,
-                'created_at' => $latest->created_at?->toIso8601String(),
-                'finished_at' => $latest->finished_at?->toIso8601String(),
-            ] : null,
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function release(Release $release, $applications): array
-    {
-        return [
-            'uuid' => $release->uuid,
-            'release_group_uuid' => $release->group?->uuid,
-            'state' => $release->state->value,
-            'trigger' => $release->trigger,
-            'correlation_id' => $release->correlation_id,
-            'requested_commit' => $release->requested_commit,
-            'notes' => $release->notes,
-            'failure_policy' => $release->failurePolicy()->value,
-            'failure_summary' => $release->failure_summary,
-            'attention_reason' => $release->attention_reason,
-            'preflight' => $release->preflight ?? [],
-            'acknowledged_checks' => $release->acknowledgedChecks(),
-            'acknowledgement_reason' => $release->acknowledgement_reason,
-            'summary' => $release->summary,
-            'created_at' => $release->created_at?->toIso8601String(),
-            'started_at' => $release->started_at?->toIso8601String(),
-            'finished_at' => $release->finished_at?->toIso8601String(),
-            'cancelled_at' => $release->cancelled_at?->toIso8601String(),
-            'members' => $release->members->map(fn (ReleaseMember $member) => [
-                'uuid' => $member->uuid,
-                'resource_type' => 'application',
-                'resource_uuid' => $applications->get($member->resource_id)?->uuid,
-                'resource_name' => $member->resource_name,
-                'phase' => $member->phase,
-                'is_required' => $member->is_required,
-                'depends_on' => $member->dependencies(),
-                'state' => $member->state->value,
-                'deployment_uuid' => $member->deployment_uuid,
-                'deployment_status' => $member->deployment_status,
-                'requested_commit' => $member->requested_commit,
-                'actual_commit' => $member->actual_commit,
-                'image_digest' => $member->image_digest,
-                'failure_reason' => $member->failure_reason,
-                'note' => $member->note,
-                'attempts' => $member->attempts,
-                'verification' => $member->verification,
-                'started_at' => $member->started_at?->toIso8601String(),
-                'finished_at' => $member->finished_at?->toIso8601String(),
-            ])->values(),
-        ];
     }
 }

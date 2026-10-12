@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
 use App\Enums\DeploymentPhase;
+use App\Services\Deployment\DeploymentArtifacts;
+use App\Services\Events\PlatformEvents;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -103,6 +105,25 @@ class ApplicationDeploymentQueue extends Model
         static::updated(function (ApplicationDeploymentQueue $deployment): void {
             if (! $deployment->wasChanged('status')) {
                 return;
+            }
+
+            $type = match ($deployment->status) {
+                ApplicationDeploymentStatus::FINISHED->value => 'deployment.finished',
+                ApplicationDeploymentStatus::FAILED->value => 'deployment.failed',
+                ApplicationDeploymentStatus::CANCELLED_BY_USER->value => 'deployment.cancelled',
+                default => null,
+            };
+            if ($type !== null) {
+                $application = $deployment->application;
+                PlatformEvents::record($type, $application?->team()?->id, 'deployment', $deployment->deployment_uuid, [
+                    'application_uuid' => $application?->uuid,
+                    'application_name' => $deployment->application_name,
+                    'server_name' => $deployment->server_name,
+                    'commit' => $deployment->commit,
+                    'pull_request_id' => (int) $deployment->pull_request_id,
+                    'image_digest' => DeploymentArtifacts::primaryDigest($deployment->artifacts),
+                    'parent_deployment_uuid' => $deployment->parent_deployment_uuid,
+                ]);
             }
 
             try {

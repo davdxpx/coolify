@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\DeploymentFreeze;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Services\Deployment\DeploymentFreezes;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -126,6 +127,7 @@ class DeploymentFreezesController extends Controller
             'allow_override' => $request->boolean('allow_override', true),
             'created_by_user_id' => $request->user()->id,
         ]);
+        DeploymentFreezes::recordEvent($freeze, 'deployment_freeze.created');
         auditLog('api.deployment_freeze.created', ['team_id' => $teamId, 'freeze_uuid' => $freeze->uuid, 'scope' => $freeze->scope()]);
 
         return response()->json(self::serialize($freeze->load(['project', 'environment'])), 201);
@@ -161,6 +163,7 @@ class DeploymentFreezesController extends Controller
         }
         if ($freeze->ended_at === null) {
             $freeze->update(['ended_at' => now(), 'ended_by_user_id' => $request->user()->id]);
+            DeploymentFreezes::recordEvent($freeze, 'deployment_freeze.ended');
             auditLog('api.deployment_freeze.ended', ['team_id' => $teamId, 'freeze_uuid' => $freeze->uuid]);
         }
 

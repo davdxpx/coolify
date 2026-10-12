@@ -11,6 +11,7 @@ use App\Jobs\CheckMissingVolumeBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
+use App\Jobs\DispatchEventDeliveriesJob;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ReconcileGithubRunnersJob;
@@ -78,6 +79,7 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->job(new ReconcileGithubRunnersJob)->everyMinute()->onOneServer();
         $this->scheduleInstance->job(new RecoverStalledDeploymentsJob)->everyFiveMinutes()->onOneServer();
         $this->scheduleInstance->job(new ReconcileReleasesJob)->everyMinute()->onOneServer();
+        $this->scheduleInstance->job(new DispatchEventDeliveriesJob)->everyMinute()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs

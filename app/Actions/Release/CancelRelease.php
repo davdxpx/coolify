@@ -85,6 +85,7 @@ class CancelRelease
             'summary' => array_merge((array) $release->summary, ReleaseOrchestrator::counts($release->members()->get())),
         ]);
 
+        $release->recordEvent('release.cancelled');
         auditLog("{$source}.release.cancelled", [
             'team_id' => $release->team_id,
             'release_uuid' => $release->uuid,

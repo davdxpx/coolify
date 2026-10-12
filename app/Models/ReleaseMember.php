@@ -18,7 +18,7 @@ use OpenApi\Attributes as OA;
         'resource_name' => ['type' => 'string'],
         'phase' => ['type' => 'integer'],
         'is_required' => ['type' => 'boolean'],
-        'depends_on' => ['type' => 'array', 'items' => new OA\Items(type: 'string')],
+        'depends_on' => ['type' => 'array', 'items' => ['type' => 'string']],
         'state' => ['type' => 'string', 'enum' => ['pending', 'dispatching', 'queued', 'deploying', 'verifying', 'succeeded', 'failed', 'skipped', 'cancelled']],
         'deployment_uuid' => ['type' => 'string', 'nullable' => true],
         'deployment_status' => ['type' => 'string', 'nullable' => true],

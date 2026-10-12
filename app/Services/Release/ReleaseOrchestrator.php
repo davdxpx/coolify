@@ -94,6 +94,7 @@ class ReleaseOrchestrator
                 'attention_reason' => 'Checks failed: '.implode(' ', array_map(fn (PreflightResult $result) => $result->summary, $blocking)),
             ]);
             $this->audit('system.release.blocked', $release, ['checks' => array_map(fn (PreflightResult $result) => $result->id, $blocking)], 'warning');
+            $release->recordEvent('release.paused', ['failed_checks' => array_map(fn (PreflightResult $result) => $result->id, $blocking)]);
 
             return false;
         }
@@ -111,6 +112,7 @@ class ReleaseOrchestrator
             $this->audit('release.checks_overridden', $release, ['checks' => $overridden, 'reason' => $release->acknowledgement_reason], 'warning');
         }
         $this->audit('system.release.started', $release);
+        $release->recordEvent('release.started');
 
         return true;
     }
@@ -133,6 +135,7 @@ class ReleaseOrchestrator
                 'attention_reason' => "{$names} did not succeed. Retry the failed resources, continue without them, or cancel the release.",
             ]);
             $this->audit('system.release.paused', $release, ['members' => $unaccepted->pluck('uuid')->all()], 'warning');
+            $release->recordEvent('release.paused', ['failed_members' => $unaccepted->pluck('resource_name')->all()]);
 
             return;
         }
@@ -405,6 +408,7 @@ class ReleaseOrchestrator
             'finished_at' => now(),
         ]);
         $this->audit('system.release.finished', $release, ['state' => $state->value], $state === ReleaseState::COMPLETED ? 'info' : 'warning');
+        $release->recordEvent("release.{$state->value}", ['counts' => self::counts($members)]);
     }
 
     /**

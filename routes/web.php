@@ -14,6 +14,7 @@ use App\Livewire\Destination\Index as DestinationIndex;
 use App\Livewire\Destination\Resources as DestinationResources;
 use App\Livewire\Destination\Show as DestinationShow;
 use App\Livewire\Dev\LivewireRequestFailurePreview;
+use App\Livewire\EventWebhooks\Index as EventWebhooksIndex;
 use App\Livewire\ForcePasswordReset;
 use App\Livewire\Notifications\Discord as NotificationDiscord;
 use App\Livewire\Notifications\Email as NotificationEmail;
@@ -290,6 +291,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
     });
     Route::get('/deployment-freezes', DeploymentFreezesIndex::class)->name('deployment-freezes.index');
+    Route::get('/event-webhooks', EventWebhooksIndex::class)->name('event-webhooks.index');
     Route::get('/project/{project_uuid}/environment/{environment_uuid}/configuration', EnvironmentConfigurationIndex::class)->name('project.configuration.index');
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/releases')->group(function () {
         Route::get('/', ReleaseGroupIndex::class)->name('project.release-group.index');

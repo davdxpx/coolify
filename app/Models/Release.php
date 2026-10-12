@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\ReleaseFailurePolicy;
 use App\Enums\ReleaseState;
+use App\Services\Events\PlatformEvents;
 use App\Services\Preflight\PreflightResult;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,7 +27,7 @@ use OpenApi\Attributes as OA;
         'created_at' => ['type' => 'string', 'format' => 'date-time'],
         'started_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
         'finished_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
-        'members' => ['type' => 'array', 'items' => new OA\Items(ref: '#/components/schemas/ReleaseMember')],
+        'members' => ['type' => 'array', 'items' => ['type' => 'object'], 'description' => 'Members in the ReleaseMember shape.'],
     ],
 )]
 class Release extends BaseModel
@@ -131,6 +132,21 @@ class Release extends BaseModel
     public function verificationTimeoutSeconds(): int
     {
         return max(60, (int) data_get($this->policy_snapshot, 'verification_timeout_seconds', 600));
+    }
+
+    /**
+     * @param  array<string, mixed>  $extra
+     */
+    public function recordEvent(string $type, array $extra = []): void
+    {
+        PlatformEvents::record($type, $this->team_id, 'release', $this->uuid, array_merge([
+            'release_group_uuid' => $this->group?->uuid,
+            'release_group_name' => $this->group?->name,
+            'state' => $this->state->value,
+            'requested_commit' => $this->requested_commit,
+            'attention_reason' => $this->attention_reason,
+            'failure_summary' => $this->failure_summary,
+        ], $extra), $this->correlation_id);
     }
 
     /**

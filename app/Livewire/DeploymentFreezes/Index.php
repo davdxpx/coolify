@@ -5,6 +5,7 @@ namespace App\Livewire\DeploymentFreezes;
 use App\Models\DeploymentFreeze;
 use App\Models\Environment;
 use App\Models\Project;
+use App\Services\Deployment\DeploymentFreezes;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Livewire\Component;
@@ -69,6 +70,7 @@ class Index extends Component
                 'allow_override' => $this->allowOverride,
                 'created_by_user_id' => auth()->id(),
             ]);
+            DeploymentFreezes::recordEvent($freeze, 'deployment_freeze.created');
             auditLog('ui.deployment_freeze.created', [
                 'team_id' => $freeze->team_id,
                 'freeze_uuid' => $freeze->uuid,
@@ -92,6 +94,7 @@ class Index extends Component
                 return;
             }
             $freeze->update(['ended_at' => now(), 'ended_by_user_id' => auth()->id()]);
+            DeploymentFreezes::recordEvent($freeze, 'deployment_freeze.ended');
             auditLog('ui.deployment_freeze.ended', ['team_id' => $freeze->team_id, 'freeze_uuid' => $freeze->uuid]);
             $this->dispatch('success', 'Deployment freeze ended.');
         } catch (\Throwable $e) {

@@ -2,6 +2,7 @@
 
 namespace App\Services\Backup;
 
+use App\Models\BackupRestoreEvidence;
 use App\Models\Environment;
 use App\Models\ScheduledDatabaseBackup;
 use App\Models\ScheduledDatabaseBackupExecution;
@@ -28,7 +29,7 @@ class BackupFreshness
     }
 
     /**
-     * @return array{database_uuid: string, database_name: string, database_type: string, configured: bool, last_success_at: Carbon|null, last_status: string|null, last_attempt_at: Carbon|null, age_hours: float|null}
+     * @return array{database_uuid: string, database_name: string, database_type: string, configured: bool, last_success_at: Carbon|null, last_status: string|null, last_attempt_at: Carbon|null, age_hours: float|null, last_restore_verified_at: string|null, last_restore_result: string|null}
      */
     public function forDatabase(Model $database): array
     {
@@ -48,6 +49,11 @@ class BackupFreshness
             ->latest('id')
             ->first(['status', 'created_at']);
         $successAt = $lastSuccess ? ($lastSuccess->finished_at ?? $lastSuccess->updated_at ?? $lastSuccess->created_at) : null;
+        $restore = BackupRestoreEvidence::query()
+            ->where('database_type', $database->getMorphClass())
+            ->where('database_id', $database->getKey())
+            ->latest('verified_at')
+            ->first(['result', 'verified_at']);
 
         return [
             'database_uuid' => (string) $database->uuid,
@@ -58,6 +64,8 @@ class BackupFreshness
             'last_status' => $lastAttempt?->status,
             'last_attempt_at' => $lastAttempt?->created_at,
             'age_hours' => $successAt ? round($successAt->diffInMinutes(now(), true) / 60, 1) : null,
+            'last_restore_verified_at' => $restore?->verified_at?->toIso8601String(),
+            'last_restore_result' => $restore?->result,
         ];
     }
 }

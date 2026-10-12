@@ -18,6 +18,10 @@
                     <x-reicon name="calendar" class="size-3.5" />
                     Deployment freezes
                 </a>
+                <a href="{{ route('event-webhooks.index') }}" {{ wireNavigate() }} class="button whitespace-nowrap">
+                    <x-reicon name="notifications" class="size-3.5" />
+                    Event webhooks
+                </a>
             </div>
         </header>
 
