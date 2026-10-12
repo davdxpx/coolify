@@ -20,6 +20,13 @@
                     <x-reicon name="variables" class="size-3.5" />
                     Shared variables
                 </a>
+                <a href="{{ route('project.release-group.index', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
+                    {{ wireNavigate() }}
+                    class="button whitespace-nowrap"
+                    aria-label="Releases of {{ $environment->name }}">
+                    <x-reicon name="play-circle" class="size-3.5" />
+                    Releases
+                </a>
                 @can('update', $project)
                     <a href="{{ route('project.environment.edit', ['project_uuid' => $project->uuid, 'environment_uuid' => $environment->uuid]) }}"
                         {{ wireNavigate() }}

@@ -275,14 +275,15 @@ it('marks a silent update as unverified after the timeout', function () {
 });
 
 it('offers an image rollback only while no migration ran since the update', function () {
-    $upgrade = distributionUpgradeTestRunning(['from_latest_migration' => '2026_10_12_180100_create_coolify_upgrades_table']);
+    $currentMigration = app(CoolifyDistribution::class)->latestAppliedMigration();
+    $upgrade = distributionUpgradeTestRunning(['from_latest_migration' => $currentMigration]);
     $upgrade->finish(CoolifyUpgradeState::SUCCEEDED);
     BuildIdentity::setCurrent(distributionTestIdentity(['build_number' => 41, 'source_commit' => $upgrade->to_commit]));
 
     $candidate = app(CoolifyDistribution::class)->rollbackCandidate();
     expect($candidate->imageRollbackSafe)->toBeTrue()
         ->and($candidate->release->build)->toBe(40)
-        ->and($candidate->release->latestMigration)->toBe('2026_10_12_180100_create_coolify_upgrades_table');
+        ->and($candidate->release->latestMigration)->toBe($currentMigration);
 
     $upgrade->update(['from_latest_migration' => '2026_01_01_000000_older_schema']);
 

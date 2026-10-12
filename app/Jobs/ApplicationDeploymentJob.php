@@ -5803,18 +5803,25 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     }
 
     /**
-     * Transition deployment to a new status with proper validation and side effects.
-     * This is the single source of truth for status transitions.
+     * The phase is informational, so a failure to record it never stops the deployment.
      */
     private function markPhase(DeploymentPhase $phase, array $timestamps = []): void
     {
         try {
             $this->application_deployment_queue->recordPhase($phase, $timestamps);
         } catch (Throwable $e) {
-            \Log::warning("Recording deployment phase {$phase->value} failed: {$e->getMessage()}");
+            try {
+                \Log::warning("Recording deployment phase {$phase->value} failed: {$e->getMessage()}");
+            } catch (Throwable) {
+                // Without a logger there is nothing left to report to.
+            }
         }
     }
 
+    /**
+     * Transition deployment to a new status with proper validation and side effects.
+     * This is the single source of truth for status transitions.
+     */
     private function transitionToStatus(ApplicationDeploymentStatus $status): void
     {
         if ($this->isInTerminalState()) {

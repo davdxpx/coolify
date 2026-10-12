@@ -156,7 +156,9 @@ class Upgrade extends Component
                 'to_version' => get_latest_version_of_coolify(),
             ]);
         } catch (\Throwable $e) {
-            return handleError($e, $this);
+            handleError($e, $this);
+
+            return false;
         }
 
         return null;

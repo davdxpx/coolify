@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\IntegrationTokensController;
 use App\Http\Controllers\Api\NotificationsController;
 use App\Http\Controllers\Api\OtherController;
 use App\Http\Controllers\Api\ProjectController;
+use App\Http\Controllers\Api\ReleasesController;
 use App\Http\Controllers\Api\ResourcesController;
 use App\Http\Controllers\Api\S3StoragesController;
 use App\Http\Controllers\Api\ScheduledTasksController;
@@ -155,6 +156,14 @@ Route::group([
     Route::get('/deployments/{uuid}', [DeployController::class, 'deployment_by_uuid'])->middleware(['api.ability:read']);
     Route::post('/deployments/{uuid}/cancel', [DeployController::class, 'cancel_deployment'])->middleware(['api.ability:deploy']);
     Route::get('/deployments/applications/{uuid}', [DeployController::class, 'get_application_deployments'])->middleware(['api.ability:read']);
+
+    Route::get('/release-groups', [ReleasesController::class, 'groups'])->middleware(['api.ability:read']);
+    Route::get('/release-groups/{uuid}', [ReleasesController::class, 'group_by_uuid'])->middleware(['api.ability:read']);
+    Route::get('/release-groups/{uuid}/releases', [ReleasesController::class, 'releases'])->middleware(['api.ability:read']);
+    Route::post('/release-groups/{uuid}/releases', [ReleasesController::class, 'start'])->middleware(['api.ability:deploy']);
+    Route::get('/releases/{uuid}', [ReleasesController::class, 'release_by_uuid'])->middleware(['api.ability:read']);
+    Route::post('/releases/{uuid}/cancel', [ReleasesController::class, 'cancel'])->middleware(['api.ability:deploy']);
+    Route::post('/releases/{uuid}/resume', [ReleasesController::class, 'resume'])->middleware(['api.ability:deploy']);
 
     Route::get('/servers', [ServersController::class, 'servers'])->middleware(['api.ability:read']);
     Route::get('/servers/{uuid}', [ServersController::class, 'server_by_uuid'])->middleware(['api.ability:read']);

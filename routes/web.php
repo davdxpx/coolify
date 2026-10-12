@@ -34,6 +34,9 @@ use App\Livewire\Project\Database\Configuration as DatabaseConfiguration;
 use App\Livewire\Project\Edit as ProjectEdit;
 use App\Livewire\Project\EnvironmentEdit;
 use App\Livewire\Project\Index as ProjectIndex;
+use App\Livewire\Project\Release\Group as ReleaseGroupShow;
+use App\Livewire\Project\Release\Index as ReleaseGroupIndex;
+use App\Livewire\Project\Release\Show as ReleaseShow;
 use App\Livewire\Project\Resource\Create as ResourceCreate;
 use App\Livewire\Project\Resource\Index as ResourceIndex;
 use App\Livewire\Project\Service\Configuration as ServiceConfiguration;
@@ -283,6 +286,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/clone', ProjectCloneMe::class)->name('project.clone-me')->middleware('can.create.resources');
         Route::get('/new', ResourceCreate::class)->name('project.resource.create')->middleware('can.create.resources');
         Route::get('/edit', EnvironmentEdit::class)->name('project.environment.edit')->middleware('can.update.resource');
+    });
+    Route::prefix('project/{project_uuid}/environment/{environment_uuid}/releases')->group(function () {
+        Route::get('/', ReleaseGroupIndex::class)->name('project.release-group.index');
+        Route::get('/{release_group_uuid}', ReleaseGroupShow::class)->name('project.release-group.show');
+        Route::get('/{release_group_uuid}/{release_uuid}', ReleaseShow::class)->name('project.release.show');
     });
     Route::prefix('project/{project_uuid}/environment/{environment_uuid}/application/{application_uuid}')->group(function () {
         Route::get('/', ApplicationConfiguration::class)->name('project.application.configuration');

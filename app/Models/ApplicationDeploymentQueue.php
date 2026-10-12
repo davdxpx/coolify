@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -96,6 +97,18 @@ class ApplicationDeploymentQueue extends Model
                 'application_name' => $application?->name,
                 'deployment_uuid' => $deployment->deployment_uuid,
             ]);
+        });
+
+        static::updated(function (ApplicationDeploymentQueue $deployment): void {
+            if (! $deployment->wasChanged('status')) {
+                return;
+            }
+
+            try {
+                ReleaseMember::wakeReleasesFor($deployment->deployment_uuid);
+            } catch (\Throwable $e) {
+                Log::warning("Waking releases for deployment {$deployment->deployment_uuid} failed: {$e->getMessage()}");
+            }
         });
     }
 

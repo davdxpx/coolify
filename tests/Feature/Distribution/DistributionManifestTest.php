@@ -199,7 +199,7 @@ it('reports upstream releases and advisories separately from fork releases', fun
 
 it('reads the running image digest from docker inspect output', function () {
     $digest = 'sha256:'.str_repeat('e', 64);
-    $image = RunningImage::parse('sha256:'.str_repeat('1', 64)."|ghcr.io/acme/coolify@{$digest}\n[\"ghcr.io/acme/coolify@{$digest}\",\"docker.io/library/redis@sha256:".str_repeat('2', 64)."\"]");
+    $image = RunningImage::parse('sha256:'.str_repeat('1', 64)."|ghcr.io/acme/coolify@{$digest}\n[\"ghcr.io/acme/coolify@{$digest}\",\"docker.io/library/redis@sha256:".str_repeat('2', 64).'"]');
 
     expect($image)->not->toBeNull()
         ->and($image->digestFor('ghcr.io/acme/coolify'))->toBe($digest)

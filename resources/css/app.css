@@ -3164,6 +3164,25 @@ input[type="search"]::-webkit-search-results-decoration {
     min-width: 52rem;
 }
 
+.release-groups-table-grid {
+    grid-template-columns: minmax(12rem, 2fr) 7rem 10rem minmax(8rem, 1fr);
+}
+
+.release-members-table-grid {
+    grid-template-columns: minmax(12rem, 1.6fr) 6rem minmax(12rem, 1.6fr) 5rem 5rem 5rem 3rem;
+    min-width: 52rem;
+}
+
+.release-history-table-grid {
+    grid-template-columns: 12rem 10rem minmax(8rem, 1fr) minmax(8rem, 1fr) minmax(10rem, 1.6fr);
+    min-width: 52rem;
+}
+
+.release-run-table-grid {
+    grid-template-columns: minmax(12rem, 1.6fr) 4rem 8rem 8rem minmax(8rem, 1fr) minmax(14rem, 2fr);
+    min-width: 58rem;
+}
+
 .server-resources-unmanaged-table-grid {
     grid-template-columns: minmax(9rem, 1fr) minmax(12rem, 1.5fr) 7rem minmax(9rem, auto);
 }

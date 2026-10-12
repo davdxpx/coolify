@@ -122,7 +122,7 @@ it('keeps helper and Traefik version updates working on fork installations', fun
 
     Queue::assertPushed(CheckTraefikVersionJob::class);
     expect(InstanceSettings::findOrFail(0)->helper_version)->toBe('9.9.9')
-        ->and(data_get(json_decode(File::get(base_path('versions.json')), true), 'traefik.v3.6'))->toBe('3.6.25');
+        ->and(json_decode(File::get(base_path('versions.json')), true)['traefik']['v3.6'] ?? null)->toBe('3.6.25');
 });
 
 it('keeps the last known manifest and reports the error when the manifest cannot be downloaded', function () {
