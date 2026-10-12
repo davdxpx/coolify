@@ -2,6 +2,7 @@
 
 use App\Exceptions\DeploymentException;
 use App\Jobs\ApplicationDeploymentJob;
+use App\Livewire\Project\Application\ZeroDowntime;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Models\Environment;
@@ -243,7 +244,7 @@ it('shows the check in the advanced settings and refuses to enable an ineligible
     $bad = blueGreenApplication($this, "services:\n  web:\n    image: nginx\n    ports: ['80:80']\n");
     $good = blueGreenApplication($this, BLUE_GREEN_WEB);
 
-    Livewire\Livewire::test(App\Livewire\Project\Application\ZeroDowntime::class, ['application' => $bad])
+    Livewire\Livewire::test(ZeroDowntime::class, ['application' => $bad])
         ->assertSee('Not possible for this Compose file')
         ->assertSee('web publishes host ports')
         ->set('isEnabled', true)
@@ -252,7 +253,7 @@ it('shows the check in the advanced settings and refuses to enable an ineligible
         ->assertSet('isEnabled', false);
     expect($bad->settings->fresh()->is_compose_blue_green_enabled)->toBeFalse();
 
-    Livewire\Livewire::test(App\Livewire\Project\Application\ZeroDowntime::class, ['application' => $good])
+    Livewire\Livewire::test(ZeroDowntime::class, ['application' => $good])
         ->set('isEnabled', true)
         ->call('instantSave')
         ->assertDispatched('success');
