@@ -43,6 +43,9 @@ afterEach(function () {
 function createServerForIpv6NormalizationTest(Team $team, PrivateKey $privateKey, string $ip, array $attributes = []): Server
 {
     return Server::factory()->create(array_merge([
+        // A fixed name: Faker person names such as "Dean O'Hara MD" fail the server name
+        // rule, and the edit tests below would then fail on validation instead of the IP.
+        'name' => 'ipv6-test-server',
         'team_id' => $team->id,
         'private_key_id' => $privateKey->id,
         'ip' => $ip,
