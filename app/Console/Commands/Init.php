@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Actions\Distribution\ReconcileDistributionUpgrades;
 use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\DeploymentPhase;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\PullChangelog;
 use App\Models\ApplicationDeploymentQueue;
@@ -103,6 +104,8 @@ class Init extends Command
                 ApplicationDeploymentStatus::QUEUED->value,
             ])->update([
                 'status' => ApplicationDeploymentStatus::FAILED->value,
+                'phase' => DeploymentPhase::FAILED->value,
+                'phase_changed_at' => now(),
             ]);
 
             if ($updatedCount > 0) {

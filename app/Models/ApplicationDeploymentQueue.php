@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Casts\EncryptedArrayCast;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\DeploymentPhase;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
@@ -42,6 +43,13 @@ use OpenApi\Attributes as OA;
         'parent_deployment_uuid' => ['type' => 'string', 'nullable' => true],
         'rollback' => ['type' => 'boolean'],
         'commit_message' => ['type' => 'string'],
+        'phase' => ['type' => 'string', 'nullable' => true, 'enum' => ['queued', 'admitted', 'dispatched', 'preparing', 'building', 'pushing', 'deploying', 'verifying', 'finished', 'failed', 'cancelled'], 'description' => 'Execution phase. Null for deployments created before phases were recorded. The status field keeps its previous meaning: in_progress means a deployment slot is reserved.'],
+        'phase_changed_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
+        'phase_history' => ['type' => 'array', 'nullable' => true, 'items' => ['type' => 'object', 'properties' => ['phase' => ['type' => 'string'], 'at' => ['type' => 'string', 'format' => 'date-time']]]],
+        'admitted_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'When a deployment slot was reserved.'],
+        'dispatched_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'When the job was handed to the queue.'],
+        'started_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true, 'description' => 'When a worker actually started the deployment.'],
+        'finished_at' => ['type' => 'string', 'format' => 'date-time', 'nullable' => true],
     ],
 )]
 class ApplicationDeploymentQueue extends Model
@@ -121,6 +129,12 @@ class ApplicationDeploymentQueue extends Model
         'horizon_job_id',
         'horizon_job_worker',
         'finished_at',
+        'phase',
+        'phase_changed_at',
+        'phase_history',
+        'admitted_at',
+        'dispatched_at',
+        'started_at',
     ];
 
     /**
@@ -140,6 +154,12 @@ class ApplicationDeploymentQueue extends Model
     protected $casts = [
         'pull_request_id' => 'integer',
         'finished_at' => 'datetime',
+        'phase' => DeploymentPhase::class,
+        'phase_changed_at' => 'datetime',
+        'phase_history' => 'array',
+        'admitted_at' => 'datetime',
+        'dispatched_at' => 'datetime',
+        'started_at' => 'datetime',
         'configuration_snapshot' => EncryptedArrayCast::class,
         'configuration_diff' => EncryptedArrayCast::class,
     ];
@@ -147,6 +167,99 @@ class ApplicationDeploymentQueue extends Model
     public function application()
     {
         return $this->belongsTo(Application::class);
+    }
+
+    /**
+     * Record an execution phase. The status column keeps its meaning (in_progress reserves a
+     * deployment slot); the phase only describes where an admitted deployment really is.
+     *
+     * @param  array<string, mixed>  $timestamps
+     * @param  list<DeploymentPhase>|null  $onlyFrom
+     */
+    public function recordPhase(DeploymentPhase $phase, array $timestamps = [], ?array $onlyFrom = null): bool
+    {
+        $now = now();
+        $recorded = DB::transaction(function () use ($phase, $timestamps, $onlyFrom, $now): ?array {
+            $current = static::query()->whereKey($this->getKey())->lockForUpdate()->first(['id', 'phase', 'phase_history', 'admitted_at', 'dispatched_at', 'started_at']);
+            if (! $current) {
+                return null;
+            }
+
+            $values = [];
+            foreach ($timestamps as $column => $value) {
+                if (in_array($column, ['admitted_at', 'dispatched_at', 'started_at'], true) && $current->{$column} === null) {
+                    $values[$column] = $value;
+                }
+            }
+
+            $allowed = ! $current->phase?->isTerminal()
+                && ($onlyFrom === null || in_array($current->phase, $onlyFrom, true));
+            if ($allowed && $current->phase !== $phase) {
+                $history = $current->phase_history ?? [];
+                $history[] = ['phase' => $phase->value, 'at' => $now->toIso8601String()];
+                $values += [
+                    'phase' => $phase->value,
+                    'phase_changed_at' => $now,
+                    'phase_history' => json_encode(array_slice($history, -30)),
+                ];
+            }
+
+            if ($values === []) {
+                return null;
+            }
+
+            static::query()->whereKey($this->getKey())->update($values + ['updated_at' => $now]);
+
+            return $values;
+        });
+
+        if ($recorded === null) {
+            return false;
+        }
+
+        foreach ($recorded as $column => $value) {
+            $this->setAttribute($column, $column === 'phase_history' ? json_decode($value, true) : $value);
+        }
+        $this->syncOriginalAttributes(array_keys($recorded));
+
+        return isset($recorded['phase']);
+    }
+
+    /**
+     * @return array{label: string, type: string, description: string, phase: ?string}
+     */
+    public function displayState(): array
+    {
+        $phase = $this->phase;
+
+        return match ($this->status) {
+            ApplicationDeploymentStatus::FINISHED->value => ['label' => 'Success', 'type' => 'success', 'description' => DeploymentPhase::FINISHED->description(), 'phase' => DeploymentPhase::FINISHED->value],
+            ApplicationDeploymentStatus::FAILED->value => ['label' => 'Failed', 'type' => 'error', 'description' => DeploymentPhase::FAILED->description(), 'phase' => DeploymentPhase::FAILED->value],
+            ApplicationDeploymentStatus::CANCELLED_BY_USER->value => ['label' => 'Cancelled', 'type' => 'neutral', 'description' => DeploymentPhase::CANCELLED->description(), 'phase' => DeploymentPhase::CANCELLED->value],
+            ApplicationDeploymentStatus::QUEUED->value => ['label' => 'Queued', 'type' => 'neutral', 'description' => DeploymentPhase::QUEUED->description(), 'phase' => DeploymentPhase::QUEUED->value],
+            ApplicationDeploymentStatus::IN_PROGRESS->value => $phase !== null && ! $phase->isTerminal() && $phase !== DeploymentPhase::QUEUED
+                ? ['label' => $phase->label(), 'type' => $phase->isWaiting() ? 'neutral' : 'warning', 'description' => $phase->description(), 'phase' => $phase->value]
+                : ['label' => 'In progress', 'type' => 'warning', 'description' => 'The deployment is running.', 'phase' => null],
+            default => ['label' => str($this->status)->headline()->toString(), 'type' => 'neutral', 'description' => '', 'phase' => $phase?->value],
+        };
+    }
+
+    public function queueWaitSeconds(): ?int
+    {
+        $admitted = $this->admitted_at;
+
+        return $admitted !== null && $this->created_at !== null ? max(0, (int) $this->created_at->diffInSeconds($admitted, true)) : null;
+    }
+
+    public function executionSeconds(): ?int
+    {
+        if ($this->started_at === null) {
+            return null;
+        }
+
+        $end = $this->finished_at ?? ($this->status === ApplicationDeploymentStatus::IN_PROGRESS->value ? now() : null);
+
+        return $end !== null ? max(0, (int) $this->started_at->diffInSeconds($end, true)) : null;
     }
 
     public function server(): Attribute

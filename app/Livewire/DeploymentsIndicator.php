@@ -32,6 +32,7 @@ class DeploymentsIndicator extends Component
                 'server_name',
                 'server_id',
                 'status',
+                'phase',
             ]);
     }
 

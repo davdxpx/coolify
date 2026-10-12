@@ -33,6 +33,7 @@ class ActiveDeployments extends Component
             'server_name',
             'server_id',
             'status',
+            'phase',
             'created_at',
             'finished_at',
         ];

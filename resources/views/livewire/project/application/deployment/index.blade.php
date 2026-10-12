@@ -182,19 +182,9 @@
                         @foreach ($deployments as $deployment)
                         @php
                             $deploymentStatus = data_get($deployment, 'status');
-                            $statusLabel = match ($deploymentStatus) {
-                                'finished' => 'Success',
-                                'in_progress' => 'In progress',
-                                'cancelled-by-user' => 'Cancelled',
-                                'queued' => 'Queued',
-                                default => str($deploymentStatus)->headline()->toString(),
-                            };
-                            $statusType = match ($deploymentStatus) {
-                                'finished' => 'success',
-                                'in_progress', 'queued' => 'warning',
-                                'failed' => 'error',
-                                default => 'neutral',
-                            };
+                            $deploymentState = $deployment->displayState();
+                            $statusLabel = $deploymentState['label'];
+                            $statusType = $deploymentState['type'];
                             $pullRequestId = (int) data_get($deployment, 'pull_request_id', 0);
                             $sourceLabel = match (true) {
                                 (bool) data_get($deployment, 'is_webhook') && $pullRequestId > 0 => 'Webhook · PR #' . $pullRequestId,

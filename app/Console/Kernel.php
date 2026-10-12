@@ -12,6 +12,7 @@ use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
 use App\Jobs\PullChangelog;
+use App\Jobs\RecoverStalledDeploymentsJob;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ReconcileGithubRunnersJob;
 use App\Jobs\RegenerateSslCertJob;
@@ -74,6 +75,7 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->job(new CheckMissingVolumeBackupsJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new RevalidateUnusableS3StoragesJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new ReconcileGithubRunnersJob)->everyMinute()->onOneServer();
+        $this->scheduleInstance->job(new RecoverStalledDeploymentsJob)->everyFiveMinutes()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs

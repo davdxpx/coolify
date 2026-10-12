@@ -13,6 +13,19 @@
                         :selected-deployment-uuid="$deployment_uuid"
                         wire:key="embedded-deployment-history-{{ $deployment_uuid }}" />
 
+                    @php
+                        $executionSummary = $this->executionSummary;
+                    @endphp
+                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-neutral-600 dark:text-fg-dim"
+                        aria-label="Deployment progress">
+                        <x-status-badge :status="$executionSummary['state']['label']" :type="$executionSummary['state']['type']" />
+                        <span class="min-w-0">{{ $executionSummary['blocking'] ?? $executionSummary['state']['description'] }}</span>
+                        @foreach ($executionSummary['timeline'] as $timelineLabel => $timelineTime)
+                            <span class="whitespace-nowrap">{{ $timelineLabel }}
+                                <time class="font-mono text-neutral-800 dark:text-fg" datetime="{{ $timelineTime->toIso8601String() }}">{{ $timelineTime->format('H:i:s') }}</time></span>
+                        @endforeach
+                    </div>
+
                     <div x-data="{
         fullscreen: @entangle('fullscreen'),
         alwaysScroll: {{ $isKeepAliveOn ? 'true' : 'false' }},
@@ -281,15 +294,9 @@
                     <div class="logs-viewer-toolbar">
                         @php
                             $deploymentStatus = data_get($application_deployment_queue, 'status');
-                            $deploymentStatusLabel = $deploymentStatus === 'in_progress'
-                                ? 'In progress'
-                                : Str::headline((string) $deploymentStatus);
-                            $deploymentStatusType = match ($deploymentStatus) {
-                                'finished' => 'success',
-                                'failed' => 'error',
-                                'queued', 'in_progress' => 'warning',
-                                default => 'neutral',
-                            };
+                            $deploymentState = $application_deployment_queue->displayState();
+                            $deploymentStatusLabel = $deploymentState['label'];
+                            $deploymentStatusType = $deploymentState['type'];
                         @endphp
                         <div class="logs-viewer-toolbar-controls">
                             <div class="logs-viewer-primary">

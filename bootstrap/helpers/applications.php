@@ -2,6 +2,7 @@
 
 use App\Actions\Application\StopApplication;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\DeploymentPhase;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
@@ -86,6 +87,9 @@ function queue_application_deployment(Application $application, string $deployme
             'git_type' => $git_type,
             'only_this_server' => $only_this_server,
             'parent_deployment_uuid' => $parent_deployment_uuid,
+            'phase' => DeploymentPhase::QUEUED->value,
+            'phase_changed_at' => now(),
+            'phase_history' => [['phase' => DeploymentPhase::QUEUED->value, 'at' => now()->toIso8601String()]],
         ]);
 
         // Decide whether to start while the application and server rows are still locked,
@@ -95,6 +99,7 @@ function queue_application_deployment(Application $application, string $deployme
             $deployment->update([
                 'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             ]);
+            $deployment->recordPhase(DeploymentPhase::ADMITTED, ['admitted_at' => now()]);
         }
 
         return ['deployment' => $deployment, 'started' => $started];
@@ -125,6 +130,7 @@ function queue_application_deployment(Application $application, string $deployme
 
             throw $exception;
         }
+        $deployment->recordPhase(DeploymentPhase::DISPATCHED, ['dispatched_at' => now()], [DeploymentPhase::ADMITTED]);
     }
 
     return [
@@ -221,6 +227,7 @@ function start_queued_deployment(ApplicationDeploymentQueue $deployment, bool $f
         $current->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
+        $current->recordPhase(DeploymentPhase::ADMITTED, ['admitted_at' => now()]);
 
         return true;
     });
@@ -238,6 +245,7 @@ function start_queued_deployment(ApplicationDeploymentQueue $deployment, bool $f
 
         return false;
     }
+    $deployment->recordPhase(DeploymentPhase::DISPATCHED, ['dispatched_at' => now()], [DeploymentPhase::ADMITTED]);
 
     return true;
 }
@@ -258,6 +266,7 @@ function fail_undispatchable_deployment(ApplicationDeploymentQueue $deployment, 
         return;
     }
 
+    $deployment->recordPhase(DeploymentPhase::FAILED);
     Log::warning("Deployment {$deployment->deployment_uuid} could not be started: {$exception->getMessage()}");
 
     $deployment->refresh();

@@ -1,24 +1,4 @@
 @php
-    $deploymentStatusMeta = function (string $status): array {
-        $label = match ($status) {
-            'finished' => 'Success',
-            'in_progress' => 'In progress',
-            'cancelled-by-user' => 'Cancelled',
-            'queued' => 'Queued',
-            'failed' => 'Failed',
-            default => str($status)->headline()->toString(),
-        };
-
-        $type = match ($status) {
-            'finished' => 'success',
-            'in_progress', 'queued' => 'warning',
-            'failed' => 'error',
-            default => 'neutral',
-        };
-
-        return [$label, $type];
-    };
-
     $hasActiveDeployments = $activeDeployments->isNotEmpty();
     $hasRecentDeployments = $recentDeployments->isNotEmpty();
     $hasAnyDeployments = $hasActiveDeployments || $hasRecentDeployments;
@@ -53,7 +33,9 @@
 
                         @foreach ($activeDeployments as $deployment)
                             @php
-                                [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment->status);
+                                $deploymentState = $deployment->displayState();
+                                $deploymentStatus = $deploymentState['label'];
+                                $deploymentStatusType = $deploymentState['type'];
                                 $projectName = $deployment->application?->environment?->project?->name;
                                 $environmentName = $deployment->application?->environment?->name;
                                 $environmentPath = collect([$projectName, $environmentName])->filter()->join(' / ');
@@ -122,7 +104,9 @@
 
                         @foreach ($recentDeployments as $deployment)
                             @php
-                                [$deploymentStatus, $deploymentStatusType] = $deploymentStatusMeta($deployment->status);
+                                $deploymentState = $deployment->displayState();
+                                $deploymentStatus = $deploymentState['label'];
+                                $deploymentStatusType = $deploymentState['type'];
                                 $projectName = $deployment->application?->environment?->project?->name;
                                 $environmentName = $deployment->application?->environment?->name;
                                 $environmentPath = collect([$projectName, $environmentName])->filter()->join(' / ');
