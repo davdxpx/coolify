@@ -185,6 +185,21 @@ COPY --chown=www-data:www-data changelogs/ ./changelogs/
 
 RUN composer dump-autoload
 
+# Custom distributions record their build identity and ship the files their upgrade script installs
+ARG COOLIFY_DISTRIBUTION=
+ARG COOLIFY_DISTRIBUTION_IMAGE=
+ARG COOLIFY_DISTRIBUTION_MANIFEST_URL=
+ARG COOLIFY_DISTRIBUTION_BUILD_NUMBER=
+ARG COOLIFY_DISTRIBUTION_SIGNATURE_ISSUER=
+ARG COOLIFY_DISTRIBUTION_SIGNATURE_IDENTITY=
+ARG COOLIFY_SOURCE_REPOSITORY=
+ARG COOLIFY_SOURCE_COMMIT=
+ARG COOLIFY_BUILD_URL=
+COPY --chmod=644 docker-compose.yml docker-compose.prod.yml .env.production /usr/local/share/coolify/source/
+COPY --chmod=755 scripts/upgrade-postgres.sh scripts/upgrade-distribution.sh /usr/local/share/coolify/source/
+COPY docker/production/write-build-identity.php /tmp/write-build-identity.php
+RUN php /tmp/write-build-identity.php /var/www/html/build.json && rm -f /tmp/write-build-identity.php
+
 # Install terminal WebSocket server dependencies
 COPY --from=terminal-dependencies --chown=www-data:www-data /terminal /terminal
 
