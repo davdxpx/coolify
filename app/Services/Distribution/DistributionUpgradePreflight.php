@@ -15,6 +15,7 @@ use App\Services\CoolifyUpgradeStatus;
 use App\Services\Preflight\PreflightResult;
 use App\Services\Registry\ManifestLookup;
 use App\Services\Registry\OciRegistryClient;
+use Illuminate\Support\Carbon;
 use Throwable;
 
 class DistributionUpgradePreflight
@@ -246,7 +247,7 @@ class DistributionUpgradePreflight
         return isset($columns[3]) && ctype_digit($columns[3]) ? (int) $columns[3] : null;
     }
 
-    private function latestInstanceBackup(): ?\Illuminate\Support\Carbon
+    private function latestInstanceBackup(): ?Carbon
     {
         $backupIds = ScheduledDatabaseBackup::query()
             ->where('database_type', StandalonePostgresql::class)

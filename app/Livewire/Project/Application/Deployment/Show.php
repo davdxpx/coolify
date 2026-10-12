@@ -6,6 +6,7 @@ use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Traits\AuditsApplicationSettings;
+use Illuminate\Support\Carbon;
 use Livewire\Component;
 
 class Show extends Component
@@ -137,7 +138,7 @@ class Show extends Component
     }
 
     /**
-     * @return array{state: array{label: string, type: string, description: string, phase: ?string}, timeline: array<string, \Illuminate\Support\Carbon>, blocking: ?string}
+     * @return array{state: array{label: string, type: string, description: string, phase: ?string}, timeline: array<string, Carbon>, blocking: ?string}
      */
     public function getExecutionSummaryProperty(): array
     {

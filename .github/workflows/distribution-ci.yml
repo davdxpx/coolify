@@ -67,16 +67,6 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
 
-      - name: Check code style of changed PHP files
-        if: ${{ github.event_name == 'pull_request' }}
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          git fetch --no-tags --depth=1 origin "${BASE_SHA}"
-          mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR "${BASE_SHA}" HEAD -- '*.php')
-          if [ "${#FILES[@]}" -gt 0 ]; then
-            vendor/bin/pint --test "${FILES[@]}"
-          fi
 
       - name: Build frontend assets
         run: |
@@ -106,3 +96,14 @@ jobs:
           COUNT=$(find database/migrations -maxdepth 1 -name '*.php' | wc -l)
           echo "latest=${LATEST}" >> "$GITHUB_OUTPUT"
           echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+
+      - name: Check code style of changed PHP files
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "${BASE_SHA}"
+          mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR "${BASE_SHA}" HEAD -- '*.php')
+          if [ "${#FILES[@]}" -gt 0 ]; then
+            vendor/bin/pint --test "${FILES[@]}"
+          fi
