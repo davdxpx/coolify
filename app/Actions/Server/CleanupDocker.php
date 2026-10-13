@@ -41,6 +41,11 @@ class CleanupDocker implements ShouldBeUnique
      */
     public const STOP_CLEANUP_COOLDOWN = 3600;
 
+    /**
+     * Local tag of the previous Coolify image that a distribution upgrade keeps for a rollback.
+     */
+    public const DISTRIBUTION_ROLLBACK_IMAGE = 'coolify-distribution:rollback';
+
     public int $jobTries = 1;
 
     /**
@@ -248,7 +253,7 @@ class CleanupDocker implements ShouldBeUnique
         // - coollabsio/coolify-helper:1.0.12
         // Pattern: (^|/)coollabsio/coolify-helper:VERSION$
         $escapedHelperVersion = preg_replace('/([.\\\\+*?\[\]^$(){}|])/', '\\\\$1', $helperImageVersion);
-        $infraExcludePattern = "(^|/)coollabsio/coolify-helper:{$escapedHelperVersion}$";
+        $infraExcludePattern = "(^|/)coollabsio/coolify-helper:{$escapedHelperVersion}$|^".self::DISTRIBUTION_ROLLBACK_IMAGE.'$';
 
         // Delete unused images that:
         // - Are not application images (don't match app repos)

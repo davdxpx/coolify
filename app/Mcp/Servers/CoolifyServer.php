@@ -11,6 +11,7 @@ use App\Mcp\Tools\Control;
 use App\Mcp\Tools\CoolifyHelp;
 use App\Mcp\Tools\Deploy;
 use App\Mcp\Tools\GetApplication;
+use App\Mcp\Tools\GetConfigurationReport;
 use App\Mcp\Tools\GetCurrentTeam;
 use App\Mcp\Tools\GetDatabase;
 use App\Mcp\Tools\GetDeployment;
@@ -18,7 +19,9 @@ use App\Mcp\Tools\GetDestination;
 use App\Mcp\Tools\GetEnvironment;
 use App\Mcp\Tools\GetInfrastructureOverview;
 use App\Mcp\Tools\GetLogs;
+use App\Mcp\Tools\GetPlatformOverview;
 use App\Mcp\Tools\GetProject;
+use App\Mcp\Tools\GetRelease;
 use App\Mcp\Tools\GetServer;
 use App\Mcp\Tools\GetServerDomains;
 use App\Mcp\Tools\GetServerResources;
@@ -37,6 +40,7 @@ use App\Mcp\Tools\ListGithubApps;
 use App\Mcp\Tools\ListGithubBranches;
 use App\Mcp\Tools\ListGithubRepositories;
 use App\Mcp\Tools\ListProjects;
+use App\Mcp\Tools\ListReleases;
 use App\Mcp\Tools\ListResources;
 use App\Mcp\Tools\ListResourceTags;
 use App\Mcp\Tools\ListScheduledTaskExecutions;
@@ -74,6 +78,7 @@ Start here (prefer these before deep get_*):
 2. get_infrastructure_overview — counts + health_hints.
 3. search_resources — fuzzy name/UUID/domain when type is unknown.
 4. list_unhealthy_resources sample_only=true — cheap "what's broken?" sample + counts.
+5. get_platform_overview — releases, freezes, build capacity, backup freshness.
 
 Then: list_*/get_* for details. Debug is DB-first:
 - list_deployments → get_deployment(include_log_summary=true)
@@ -95,6 +100,10 @@ MD;
         GetInfrastructureOverview::class,
         SearchResources::class,
         ListUnhealthyResources::class,
+        GetPlatformOverview::class,
+        ListReleases::class,
+        GetRelease::class,
+        GetConfigurationReport::class,
         GetCurrentTeam::class,
         ListTeamMembers::class,
         ListServers::class,

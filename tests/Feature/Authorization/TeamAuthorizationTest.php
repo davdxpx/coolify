@@ -17,7 +17,9 @@ beforeEach(function () {
     $settings->id = 0;
     $settings->save();
 
-    $this->team = Team::factory()->create(['personal_team' => false]);
+    // A fixed name: Faker company names such as "O'Hara, Kiehn and Romaguera" fail the
+    // team name rule, and the settings tests below would then fail on validation.
+    $this->team = Team::factory()->create(['personal_team' => false, 'name' => 'Authorization Test Team']);
 
     $this->owner = User::factory()->create();
     $this->owner->teams()->attach($this->team, ['role' => 'owner']);

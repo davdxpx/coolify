@@ -2,8 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Actions\Distribution\ReconcileDistributionUpgrades;
 use App\Enums\ActivityTypes;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\DeploymentPhase;
 use App\Jobs\CheckHelperImageJob;
 use App\Jobs\PullChangelog;
 use App\Models\ApplicationDeploymentQueue;
@@ -92,11 +94,18 @@ class Init extends Command
             echo "Continuing with initialization - cleanup errors will not prevent Coolify from starting\n";
         }
         try {
+            ReconcileDistributionUpgrades::run();
+        } catch (\Throwable $e) {
+            echo "Could not reconcile distribution upgrades: {$e->getMessage()}\n";
+        }
+        try {
             $updatedCount = ApplicationDeploymentQueue::whereIn('status', [
                 ApplicationDeploymentStatus::IN_PROGRESS->value,
                 ApplicationDeploymentStatus::QUEUED->value,
             ])->update([
                 'status' => ApplicationDeploymentStatus::FAILED->value,
+                'phase' => DeploymentPhase::FAILED->value,
+                'phase_changed_at' => now(),
             ]);
 
             if ($updatedCount > 0) {

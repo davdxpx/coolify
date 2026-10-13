@@ -20,7 +20,9 @@ class TeamFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->company().' Team',
+            // Without apostrophes: Faker companies such as "O'Hara, Kiehn and Romaguera" fail
+            // ValidationPatterns::nameRules(), and tests that save the team form failed at random.
+            'name' => str_replace("'", '', $this->faker->company()).' Team',
             'description' => $this->faker->sentence(),
             'personal_team' => false,
             'show_boarding' => false,

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Actions\Docker\GetContainersStatus;
 use App\Actions\Shared\EnsureContentFilesOnServer;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\DeploymentPhase;
 use App\Enums\ProcessStatus;
 use App\Enums\StaticImageTypes;
 use App\Events\ApplicationConfigurationChanged;
@@ -21,6 +22,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\Deployment\DeploymentArtifacts;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
 use App\Support\ValidationPatterns;
@@ -353,6 +355,11 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
             return;
         }
+        if ($this->application_deployment_queue->status !== ApplicationDeploymentStatus::IN_PROGRESS->value) {
+            $this->application_deployment_queue->addLogEntry("A worker picked up this deployment, but it is no longer admitted (status: {$this->application_deployment_queue->status}). It was not started.");
+
+            return;
+        }
 
         try {
             $this->validateDeploymentEnvironmentVariableKeys();
@@ -368,6 +375,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             'horizon_job_worker' => gethostname(),
         ]);
+        $this->markPhase(DeploymentPhase::PREPARING, ['started_at' => now()]);
         if ($this->server->isFunctionalAfterRecheck() === false) {
             $this->application_deployment_queue->addLogEntry('Server is not functional.');
             $this->fail('Server is not functional.');
@@ -851,6 +859,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         // Modify Dockerfiles for ARGs and build secrets
         $this->modify_dockerfiles_for_compose($composeFile);
         // Build new container to limit downtime.
+        $this->markPhase(DeploymentPhase::BUILDING);
         $this->application_deployment_queue->addLogEntry('Pulling & building required images.');
 
         // Save build-time .env file BEFORE the build
@@ -992,6 +1001,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function start_docker_compose_services(): void
     {
+        $this->markPhase(DeploymentPhase::DEPLOYING);
         $this->write_missing_content_files();
 
         $server_workdir = $this->application->workdir();
@@ -1311,6 +1321,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
         if ($this->is_this_additional_server) {
             return;
         }
+        $this->markPhase(DeploymentPhase::PUSHING);
         try {
             instant_remote_process(["docker images --format '{{json .}}' {$this->production_image_name}"], $this->server);
             $this->application_deployment_queue->addLogEntry('----------------------------------------');
@@ -1434,6 +1445,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function just_restart()
     {
+        $this->markPhase(DeploymentPhase::DEPLOYING);
         $this->application_deployment_queue->addLogEntry("Restarting {$this->customRepository}:{$this->application->git_branch} on {$this->server->name}.");
 
         // Restart doesn't need the build server — disable it so the helper container
@@ -2618,6 +2630,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     {
         try {
             $this->checkForCancellation();
+            $this->markPhase(DeploymentPhase::DEPLOYING);
             if ($this->server->isSwarm()) {
                 $this->application_deployment_queue->addLogEntry('Rolling update started.');
                 $this->execute_remote_command(
@@ -2667,6 +2680,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function health_check()
     {
+        $this->markPhase(DeploymentPhase::VERIFYING);
         try {
             if ($this->server->isSwarm()) {
                 // Implement healthcheck for swarm
@@ -3152,7 +3166,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
      */
     private function reuse_commit_message(): void
     {
-        if (filled($this->application_deployment_queue->commit_message) || $this->shouldResolveBranchHeadCommit()) {
+        if (! $this->application_deployment_queue->exists || filled($this->application_deployment_queue->commit_message) || $this->shouldResolveBranchHeadCommit()) {
             return;
         }
 
@@ -3743,6 +3757,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
     private function build_railpack_image(): void
     {
+        $this->markPhase(DeploymentPhase::BUILDING);
         $this->ensure_docker_buildx_available_for_railpack();
         $this->ensure_helper_docker_buildx_available_for_railpack();
 
@@ -4399,6 +4414,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function build_static_image()
     {
+        $this->markPhase(DeploymentPhase::BUILDING);
         $this->application_deployment_queue->addLogEntry('----------------------------------------');
         $this->application_deployment_queue->addLogEntry('Static deployment. Copying static assets to the image.');
         if ($this->application->static_image) {
@@ -4471,6 +4487,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
 
     private function build_image()
     {
+        $this->markPhase(DeploymentPhase::BUILDING);
         // Add Coolify related variables to the build args/secrets
         if (! $this->dockerSecretsSupported) {
             // Traditional build args approach - generate COOLIFY_ variables locally
@@ -5787,6 +5804,22 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
     }
 
     /**
+     * The phase is informational, so a failure to record it never stops the deployment.
+     */
+    private function markPhase(DeploymentPhase $phase, array $timestamps = []): void
+    {
+        try {
+            $this->application_deployment_queue->recordPhase($phase, $timestamps);
+        } catch (Throwable $e) {
+            try {
+                \Log::warning("Recording deployment phase {$phase->value} failed: {$e->getMessage()}");
+            } catch (Throwable) {
+                // Without a logger there is nothing left to report to.
+            }
+        }
+    }
+
+    /**
      * Transition deployment to a new status with proper validation and side effects.
      * This is the single source of truth for status transitions.
      */
@@ -5855,6 +5888,7 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
      */
     private function handleCancelledDeployment(): void
     {
+        $this->markPhase(DeploymentPhase::CANCELLED);
         if (filled($this->application_deployment_queue->parent_deployment_uuid)) {
             $this->sendMultiServerDeploymentNotification($this->application_deployment_queue->parent_deployment_uuid);
         }
@@ -5868,6 +5902,15 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
         $this->application_deployment_queue->update([
             'status' => $status->value,
         ]);
+        $phase = match ($status) {
+            ApplicationDeploymentStatus::FINISHED => DeploymentPhase::FINISHED,
+            ApplicationDeploymentStatus::FAILED => DeploymentPhase::FAILED,
+            ApplicationDeploymentStatus::CANCELLED_BY_USER => DeploymentPhase::CANCELLED,
+            default => null,
+        };
+        if ($phase !== null) {
+            $this->markPhase($phase);
+        }
     }
 
     /**
@@ -5992,7 +6035,25 @@ COPY ./nginx.conf /etc/nginx/conf.d/default.conf");
      */
     private function completeDeployment(): void
     {
+        $this->recordArtifacts();
         $this->transitionToStatus(ApplicationDeploymentStatus::FINISHED);
+    }
+
+    /**
+     * Records the images the deployment runs before it is reported as finished, so releases and
+     * rollbacks can read them right away. Never fails the deployment.
+     */
+    private function recordArtifacts(): void
+    {
+        if ($this->pull_request_id !== 0 || $this->server->isSwarm() || ! $this->server->isFunctional()) {
+            return;
+        }
+
+        try {
+            app(DeploymentArtifacts::class)->capture($this->application_deployment_queue, $this->application, $this->server);
+        } catch (Throwable $e) {
+            $this->logStatusTransitionSideEffectFailure('Recording the deployed images failed', $e);
+        }
     }
 
     /**

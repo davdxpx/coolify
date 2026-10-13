@@ -17,8 +17,10 @@
             <div class="max-h-96 space-y-1 overflow-y-auto p-2 scrollbar">
                 @foreach ($this->deployments as $deployment)
                     @php
-                        $deploymentStatus = $deployment->status === 'in_progress' ? 'In progress' : 'Queued';
-                        $deploymentStatusType = $deployment->status === 'in_progress' ? 'warning' : 'neutral';
+                        $deploymentState = $deployment->displayState();
+                        $deploymentStatus = $deploymentState['label'];
+                        $deploymentStatusType = $deploymentState['type'];
+                        $deploymentIsRunning = $deployment->status === 'in_progress' && ! ($deployment->phase?->isWaiting() ?? false);
                         $projectName = $deployment->application?->environment?->project?->name;
                         $environmentName = $deployment->application?->environment?->name;
                         $environmentPath = collect([$projectName, $environmentName])->filter()->join(' / ');
@@ -28,7 +30,7 @@
                         class="flex items-start gap-3 rounded-lg border border-transparent p-3 transition-colors hover:border-neutral-200 hover:bg-neutral-50 hover:no-underline dark:border-coolgray-300 dark:hover:border-coolgray-400 dark:hover:bg-raised">
                         <div
                             class="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 text-coollabs dark:border-coolgray-300 dark:bg-raised dark:text-warning">
-                            @if ($deployment->status === 'in_progress')
+                            @if ($deploymentIsRunning)
                                 <svg class="size-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none"
                                     viewBox="0 0 24 24" aria-hidden="true">
                                     <circle class="opacity-25" cx="12" cy="12" r="10"

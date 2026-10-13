@@ -13,7 +13,7 @@ class CoolifyHelp extends Tool
 {
     protected string $name = 'coolify_help';
 
-    protected string $description = 'Tool catalog by intent. Call first when unsure which Coolify MCP tool to use. Optional intent: overview | search | inventory | debug | deploy | github | team | essentials.';
+    protected string $description = 'Tool catalog by intent. Call first when unsure which Coolify MCP tool to use. Optional intent: overview | releases | search | inventory | debug | deploy | github | team | essentials.';
 
     use BuildsResponse;
     use ResolvesTeam;
@@ -43,6 +43,15 @@ class CoolifyHelp extends Tool
                     'list_unhealthy_resources',
                     'search_resources',
                     'get_current_team',
+                ],
+            ],
+            'releases' => [
+                'description' => 'Releases, freezes, configuration drift and backup freshness',
+                'tools' => [
+                    'get_platform_overview',
+                    'list_releases',
+                    'get_release',
+                    'get_configuration_report',
                 ],
             ],
             'search' => [
@@ -174,7 +183,7 @@ class CoolifyHelp extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'intent' => $schema->string()->description('Optional: overview | search | inventory | debug | deploy | github | team | essentials.'),
+            'intent' => $schema->string()->description('Optional: overview | releases | search | inventory | debug | deploy | github | team | essentials.'),
         ];
     }
 }

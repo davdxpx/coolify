@@ -4,6 +4,8 @@ namespace App\Actions\Server;
 
 use App\Models\Server;
 use App\Services\CoolifyUpgradeStatus;
+use App\Services\Distribution\BuildIdentity;
+use App\Services\Distribution\DistributionUpgradeRefused;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Sleep;
@@ -21,6 +23,10 @@ class UpdateCoolify
 
     public function handle($manual_update = false)
     {
+        if (BuildIdentity::current()->isCustom()) {
+            throw new DistributionUpgradeRefused('This installation runs a custom Coolify distribution. The official update path would replace it, so it is disabled. Use the distribution update channel instead.');
+        }
+
         if (isDev()) {
             Sleep::for(10)->seconds();
 

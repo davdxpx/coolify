@@ -2,6 +2,7 @@
 
 namespace App\Console;
 
+use App\Actions\Distribution\ReconcileDistributionUpgrades;
 use App\Jobs\ApiTokenExpirationWarningJob;
 use App\Jobs\CheckForUpdatesJob;
 use App\Jobs\CheckHelperImageJob;
@@ -10,15 +11,20 @@ use App\Jobs\CheckMissingVolumeBackupsJob;
 use App\Jobs\CleanupInstanceStuffsJob;
 use App\Jobs\CleanupOrphanedPreviewContainersJob;
 use App\Jobs\CleanupStaleMultiplexedConnections;
+use App\Jobs\DispatchEventDeliveriesJob;
 use App\Jobs\PullChangelog;
 use App\Jobs\PullTemplatesFromCDN;
 use App\Jobs\ReconcileGithubRunnersJob;
+use App\Jobs\ReconcileReleasesJob;
+use App\Jobs\RecoverStalledDeploymentsJob;
 use App\Jobs\RegenerateSslCertJob;
 use App\Jobs\RevalidateUnusableS3StoragesJob;
 use App\Jobs\ScheduledJobManager;
 use App\Jobs\ServerManagerJob;
 use App\Jobs\UpdateCoolifyJob;
+use App\Models\CoolifyUpgrade;
 use App\Models\InstanceSettings;
+use App\Services\Distribution\BuildIdentity;
 use App\Services\ScheduledJobDeliveryService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
@@ -71,6 +77,9 @@ class Kernel extends ConsoleKernel
         $this->scheduleInstance->job(new CheckMissingVolumeBackupsJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new RevalidateUnusableS3StoragesJob)->hourly()->onOneServer();
         $this->scheduleInstance->job(new ReconcileGithubRunnersJob)->everyMinute()->onOneServer();
+        $this->scheduleInstance->job(new RecoverStalledDeploymentsJob)->everyFiveMinutes()->onOneServer();
+        $this->scheduleInstance->job(new ReconcileReleasesJob)->everyMinute()->onOneServer();
+        $this->scheduleInstance->job(new DispatchEventDeliveriesJob)->everyMinute()->onOneServer();
 
         if (isDev()) {
             // Instance Jobs
@@ -167,7 +176,20 @@ class Kernel extends ConsoleKernel
             ->timezone($this->instanceTimezone)
             ->onOneServer();
 
-        if ($this->settings->is_auto_update_enabled) {
+        $isCustomDistribution = BuildIdentity::current()->isCustom();
+        if ($isCustomDistribution) {
+            $this->scheduleInstance->call(fn () => ReconcileDistributionUpgrades::dispatch())
+                ->name('distribution:reconcile-upgrades')
+                ->everyMinute()
+                ->onOneServer()
+                ->when(fn () => CoolifyUpgrade::query()->active()->exists());
+        }
+
+        $isAutoUpdateEnabled = $isCustomDistribution
+            ? (bool) $this->settings->is_distribution_auto_update_enabled
+            : $this->settings->is_auto_update_enabled;
+
+        if ($isAutoUpdateEnabled) {
             $autoUpdateFrequency = $this->settings->auto_update_frequency;
             $this->scheduleInstance->job(new UpdateCoolifyJob)
                 ->cron($autoUpdateFrequency)

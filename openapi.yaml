@@ -4167,6 +4167,176 @@ paths:
       security:
         -
           bearerAuth: []
+  '/configuration/environments/{uuid}':
+    get:
+      tags:
+        - Configuration
+      summary: 'Configuration report of an environment'
+      description: 'Changes not deployed yet, shared variables changed after the last deployment, references to missing shared variables, contract violations and secrets due for rotation. Never contains values.'
+      operationId: get-environment-configuration-report
+      parameters:
+        -
+          name: uuid
+          in: path
+          description: 'Environment UUID'
+          required: true
+          schema:
+            type: string
+        -
+          name: rotation_days
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 180
+            maximum: 3650
+            minimum: 1
+      responses:
+        '200':
+          description: Report.
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/configuration/shared-variables/{id}/rotation-plan':
+    get:
+      tags:
+        - Configuration
+      summary: 'Rotation plan of a shared variable'
+      description: 'Every resource that reads the shared variable and the steps to rotate it. Never contains the value.'
+      operationId: get-shared-variable-rotation-plan
+      parameters:
+        -
+          name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 'Rotation plan.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/configuration-contract':
+    get:
+      tags:
+        - Configuration
+      summary: 'Get configuration contract'
+      description: 'The environment variable keys the application declares as required or optional.'
+      operationId: get-application-configuration-contract
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Contract and its current check.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    put:
+      tags:
+        - Configuration
+      summary: 'Set configuration contract'
+      description: 'Declare which environment variable keys the application needs, for example from the repository that builds it. Only keys are sent, never values.'
+      operationId: put-application-configuration-contract
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - required_keys
+              properties:
+                required_keys:
+                  type: array
+                  items: { type: string }
+                optional_keys:
+                  type: array
+                  items: { type: string }
+                source:
+                  type: string
+                  maxLength: 255
+                source_revision:
+                  type: string
+                  maxLength: 255
+              type: object
+      responses:
+        '200':
+          description: 'Contract stored.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Admin permissions required.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+    delete:
+      tags:
+        - Configuration
+      summary: 'Delete configuration contract'
+      operationId: delete-application-configuration-contract
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Contract deleted.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Admin permissions required.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   '/databases/{uuid}/imports/uploads':
     post:
       tags:
@@ -6910,6 +7080,111 @@ paths:
       security:
         -
           bearerAuth: []
+  /deployment-freezes:
+    get:
+      tags:
+        - Releases
+      summary: 'List deployment freezes'
+      description: 'Active, planned and recently ended deployment freezes of the team.'
+      operationId: list-deployment-freezes
+      responses:
+        '200':
+          description: Freezes.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DeploymentFreeze'
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Releases
+      summary: 'Create deployment freeze'
+      description: 'Block deployments of the team, a project or an environment for a period.'
+      operationId: create-deployment-freeze
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  maxLength: 255
+                project_uuid:
+                  type: [string, 'null']
+                environment_uuid:
+                  description: 'Requires project_uuid.'
+                  type: [string, 'null']
+                starts_at:
+                  description: 'Defaults to now.'
+                  type: [string, 'null']
+                  format: date-time
+                ends_at:
+                  type: [string, 'null']
+                  format: date-time
+                allow_rollbacks:
+                  type: boolean
+                  default: true
+                allow_override:
+                  type: boolean
+                  default: true
+              type: object
+      responses:
+        '201':
+          description: 'Freeze created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentFreeze'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Admin permissions required.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/deployment-freezes/{uuid}/end':
+    post:
+      tags:
+        - Releases
+      summary: 'End deployment freeze'
+      description: 'End a freeze now.'
+      operationId: end-deployment-freeze
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Freeze ended.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeploymentFreeze'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Admin permissions required.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
   /destinations:
     get:
       tags:
@@ -7249,6 +7524,192 @@ paths:
           description: 'Validation failed.'
         '429':
           description: 'DigitalOcean rate limit exceeded.'
+      security:
+        -
+          bearerAuth: []
+  /events:
+    get:
+      tags:
+        - Events
+      summary: 'Events feed'
+      description: 'Team events in recording order. Poll with `after` set to the last `id` you processed; the response contains `next_after` for the next call. Events are kept for 30 days.'
+      operationId: list-events
+      parameters:
+        -
+          name: after
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 0
+        -
+          name: types
+          in: query
+          description: 'Comma-separated event types.'
+          required: false
+          schema:
+            type: string
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 100
+            maximum: 500
+      responses:
+        '200':
+          description: Events.
+          content:
+            application/json:
+              schema:
+                properties:
+                  events: { type: array, items: { $ref: '#/components/schemas/PlatformEvent' } }
+                  next_after: { type: integer }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+  /event-subscriptions:
+    get:
+      tags:
+        - Events
+      summary: 'List event webhooks'
+      operationId: list-event-subscriptions
+      responses:
+        '200':
+          description: 'Subscriptions. The target URL is shown by host only.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Events
+      summary: 'Create event webhook'
+      description: 'Deliver team events to an HTTPS endpoint. Every request carries `Coolify-Event`, `Coolify-Delivery` and `Coolify-Signature: t=<unix time>,v1=<hex HMAC-SHA256 of "<time>.<body>" with the secret>`. The secret is returned once. Private and internal addresses are refused.'
+      operationId: create-event-subscription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - name
+                - url
+              properties:
+                name:
+                  type: string
+                url:
+                  type: string
+                  format: uri
+                event_types:
+                  description: 'Event types, or ["*"] for all (default).'
+                  type: array
+                  items: { type: string }
+              type: object
+      responses:
+        '201':
+          description: 'Subscription created. Contains `secret` this one time.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Admin permissions required.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/event-subscriptions/{uuid}':
+    delete:
+      tags:
+        - Events
+      summary: 'Delete event webhook'
+      operationId: delete-event-subscription
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Admin permissions required.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/event-subscriptions/{uuid}/test':
+    post:
+      tags:
+        - Events
+      summary: 'Send a test event'
+      description: 'Records a `ping` event for this subscription only and enables a subscription that was disabled after failures.'
+      operationId: test-event-subscription
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: 'Test delivery queued.'
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Admin permissions required.'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/event-subscriptions/{uuid}/deliveries':
+    get:
+      tags:
+        - Events
+      summary: 'Recent deliveries of an event webhook'
+      operationId: list-event-subscription-deliveries
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'The last 50 deliveries.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -8586,6 +9047,211 @@ paths:
           $ref: '#/components/responses/401'
         '400':
           $ref: '#/components/responses/400'
+  /platform/overview:
+    get:
+      tags:
+        - Platform
+      summary: 'Platform overview'
+      description: 'One read model of the team: Coolify version, servers with build capacity, deployment counts, active and recent releases, deployment freezes, database backup freshness and event webhook health. Identifiers and states only.'
+      operationId: get-platform-overview
+      responses:
+        '200':
+          description: Overview.
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+  /platform/metrics:
+    get:
+      tags:
+        - Platform
+      summary: 'Platform metrics'
+      description: 'Deployment counts by status, queue wait and execution time percentiles (overall and per server), release outcomes and failed event deliveries over a window.'
+      operationId: get-platform-metrics
+      parameters:
+        -
+          name: hours
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 24
+            maximum: 720
+            minimum: 1
+      responses:
+        '200':
+          description: Metrics.
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+  '/applications/{uuid}/rollback-candidates':
+    get:
+      tags:
+        - Platform
+      summary: 'Rollback candidates'
+      description: 'Earlier successful deployments of an application with their images, the configuration and shared variable changes made since, and warnings. With check_images=true the server is asked which images still exist.'
+      operationId: get-application-rollback-candidates
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 10
+            maximum: 25
+        -
+          name: check_images
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Candidates.
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  /backups/freshness:
+    get:
+      tags:
+        - Platform
+      summary: 'Backup freshness'
+      description: 'Per database of the team (or of one environment): whether a backup schedule is enabled, the last successful backup, its age and the last recorded restore test.'
+      operationId: get-backup-freshness
+      parameters:
+        -
+          name: environment_uuid
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Freshness per database.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/databases/{uuid}/restore-evidence':
+    get:
+      tags:
+        - Platform
+      summary: 'Restore tests of a database'
+      operationId: list-database-restore-evidence
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Recorded restore tests, newest first.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Platform
+      summary: 'Record a restore test'
+      description: 'Record that a backup of the database was restored and checked, for example in a rehearsal on a separate host. Coolify stores the evidence; it does not perform the restore.'
+      operationId: create-database-restore-evidence
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - result
+              properties:
+                result:
+                  type: string
+                  enum: [passed, failed]
+                method:
+                  type: string
+                  default: manual
+                  enum: [manual, automated]
+                backup_execution_uuid:
+                  type: [string, 'null']
+                verified_at:
+                  type: [string, 'null']
+                  format: date-time
+                notes:
+                  type: [string, 'null']
+                  maxLength: 2000
+              type: object
+      responses:
+        '201':
+          description: Recorded.
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Admin permissions required.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
   /projects:
     get:
       tags:
@@ -8984,6 +9650,305 @@ paths:
           description: 'Environment with this name already exists.'
         '422':
           $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  /release-groups:
+    get:
+      tags:
+        - Releases
+      summary: 'List release groups'
+      description: 'List the release groups of the team with their resources and latest release.'
+      operationId: list-release-groups
+      responses:
+        '200':
+          description: 'Release groups.'
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReleaseGroup'
+        '401':
+          $ref: '#/components/responses/401'
+      security:
+        -
+          bearerAuth: []
+  '/release-groups/{uuid}':
+    get:
+      tags:
+        - Releases
+      summary: 'Get release group'
+      description: 'Get a release group by UUID.'
+      operationId: get-release-group-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Release group.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReleaseGroup'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/release-groups/{uuid}/releases':
+    get:
+      tags:
+        - Releases
+      summary: 'List releases of a group'
+      description: 'The latest releases of a release group, newest first.'
+      operationId: list-releases-by-group-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Releases.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Release'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    post:
+      tags:
+        - Releases
+      summary: 'Start release'
+      description: 'Start a release of a release group. Send an Idempotency-Key header to make retries safe: a second request with the same key returns the release created by the first one.'
+      operationId: start-release
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+        -
+          name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+            maxLength: 200
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              properties:
+                commit:
+                  description: 'Commit SHA, branch or tag for every application that builds from Git.'
+                  type: string
+                notes:
+                  type: string
+                  maxLength: 2000
+                acknowledged_checks:
+                  description: 'Checks to override if they fail. Requires acknowledgement_reason; every override is audited.'
+                  type: array
+                  items: { type: string, enum: [deployment_freeze, release_window, backup_freshness, configuration] }
+                acknowledgement_reason:
+                  type: string
+                  maxLength: 500
+              type: object
+      responses:
+        '201':
+          description: 'Release created.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        '200':
+          description: 'A release with this Idempotency-Key already exists.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'The release cannot start, for example because another release of the group is running.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/releases/{uuid}':
+    get:
+      tags:
+        - Releases
+      summary: 'Get release'
+      description: 'Get a release with the state of every resource in it.'
+      operationId: get-release-by-uuid
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Release.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+  '/releases/{uuid}/cancel':
+    post:
+      tags:
+        - Releases
+      summary: 'Cancel release'
+      description: 'Cancel a release. Resources that have not started are not deployed and deployments waiting in the queue are cancelled; running deployments finish.'
+      operationId: cancel-release
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Release cancelled.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'The release has already ended or is not allowed for this token.'
+      security:
+        -
+          bearerAuth: []
+  '/releases/{uuid}/resume':
+    post:
+      tags:
+        - Releases
+      summary: 'Continue release'
+      description: 'Continue a paused release: retry the failed resources, continue without them, or override failed checks before the first deployment (with a reason, audited).'
+      operationId: resume-release
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - mode
+              properties:
+                mode:
+                  type: string
+                  enum: [retry, continue, override]
+                acknowledged_checks:
+                  description: 'For override: the failed checks to override.'
+                  type: array
+                  items: { type: string }
+                reason:
+                  description: 'For override: why the checks are overridden.'
+                  type: string
+                  maxLength: 500
+              type: object
+      responses:
+        '200':
+          description: 'Release continues.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Release'
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+        '409':
+          description: 'The release is not paused or is not allowed for this token.'
+        '422':
+          $ref: '#/components/responses/422'
+      security:
+        -
+          bearerAuth: []
+  '/servers/{uuid}/build-capacity':
+    get:
+      tags:
+        - Releases
+      summary: 'Build capacity of a server'
+      description: 'Deployment slots of a server: the limit, slots running a deployment, slots reserved for a deployment that waits for a worker, and the queue.'
+      operationId: get-server-build-capacity
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'Build capacity.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  server_uuid: { type: string }
+                  server_name: { type: string }
+                  concurrent_builds: { type: integer }
+                  running: { type: integer }
+                  reserved: { type: integer }
+                  free_slots: { type: integer }
+                  queued: { type: integer }
+                  queue_limit: { type: integer }
+                  oldest_queued_seconds: { type: [integer, 'null'] }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
       security:
         -
           bearerAuth: []
@@ -15238,6 +16203,60 @@ components:
           type: boolean
         commit_message:
           type: string
+        phase:
+          type: string
+          nullable: true
+          enum:
+            - queued
+            - admitted
+            - dispatched
+            - preparing
+            - building
+            - pushing
+            - deploying
+            - verifying
+            - finished
+            - failed
+            - cancelled
+          description: 'Execution phase. Null for deployments created before phases were recorded. The status field keeps its previous meaning: in_progress means a deployment slot is reserved.'
+        phase_changed_at:
+          type: string
+          format: date-time
+          nullable: true
+        artifacts:
+          type: object
+          nullable: true
+          description: 'Images the finished deployment runs: per container the image, its local image id and, when known, its registry digest.'
+        phase_history:
+          type: array
+          nullable: true
+          items:
+            type: object
+            properties:
+              phase:
+                type: string
+              at:
+                type: string
+                format: date-time
+        admitted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 'When a deployment slot was reserved.'
+        dispatched_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 'When the job was handed to the queue.'
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 'When a worker actually started the deployment.'
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
       type: object
     ApplicationSetting:
       description: 'Application settings.'
@@ -15326,6 +16345,61 @@ components:
           type: integer
           nullable: true
       type: object
+    ConfigurationContract:
+      description: 'The environment variable keys an application needs. Only keys are stored, never values.'
+      properties:
+        required_keys:
+          type: array
+          items:
+            type: string
+        optional_keys:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+          nullable: true
+          description: 'Where the contract comes from, for example a file in a repository.'
+        source_revision:
+          type: string
+          nullable: true
+        updated_at:
+          type: string
+          format: date-time
+      type: object
+    DeploymentFreeze:
+      description: 'A period in which deployments of a team, project or environment are blocked.'
+      properties:
+        uuid:
+          type: string
+        reason:
+          type: string
+        scope:
+          type: string
+          enum:
+            - team
+            - project
+            - environment
+        project_uuid:
+          type: string
+          nullable: true
+        environment_uuid:
+          type: string
+          nullable: true
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+          nullable: true
+        allow_rollbacks:
+          type: boolean
+        allow_override:
+          type: boolean
+        is_active:
+          type: boolean
+      type: object
     Environment:
       description: 'Environment model'
       properties:
@@ -15384,6 +16458,32 @@ components:
         updated_at:
           type: string
       type: object
+    PlatformEvent:
+      description: 'Something that happened in a team, in the order it was recorded. Never contains secrets.'
+      properties:
+        id:
+          type: integer
+          description: 'Increasing cursor for the events feed.'
+        uuid:
+          type: string
+        type:
+          type: string
+          example: release.completed
+        subject_type:
+          type: string
+          example: release
+        subject_uuid:
+          type: string
+          nullable: true
+        correlation_id:
+          type: string
+          nullable: true
+        data:
+          type: object
+        occurred_at:
+          type: string
+          format: date-time
+      type: object
     PrivateKey:
       description: 'Private Key model'
       properties:
@@ -15424,6 +16524,156 @@ components:
           type: string
         description:
           type: string
+      type: object
+    Release:
+      description: 'One run of a release group.'
+      properties:
+        uuid:
+          type: string
+        release_group_uuid:
+          type: string
+        state:
+          type: string
+          enum:
+            - created
+            - validating
+            - running
+            - attention_required
+            - completed
+            - partially_failed
+            - failed
+            - cancelled
+        trigger:
+          type: string
+          enum:
+            - ui
+            - api
+            - retry
+        correlation_id:
+          type: string
+        requested_commit:
+          type: string
+          nullable: true
+        failure_summary:
+          type: string
+          nullable: true
+        attention_reason:
+          type: string
+          nullable: true
+        acknowledged_checks:
+          type: array
+          items:
+            type: string
+          description: 'Failed checks that were overridden with a reason.'
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+        members:
+          type: array
+          items:
+            type: object
+          description: 'Members in the ReleaseMember shape.'
+      type: object
+    ReleaseGroup:
+      description: 'A set of resources in one environment that are deployed together in a defined order.'
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        environment_uuid:
+          type: string
+        is_enabled:
+          type: boolean
+        failure_policy:
+          type: string
+          enum:
+            - stop
+            - continue_independent
+            - manual
+        max_parallel:
+          type: integer
+        require_healthy:
+          type: boolean
+        verification_timeout_seconds:
+          type: integer
+      type: object
+    ReleaseMember:
+      description: 'The execution of one resource inside a release.'
+      properties:
+        uuid:
+          type: string
+        resource_type:
+          type: string
+          example: application
+        resource_uuid:
+          type: string
+          nullable: true
+        resource_name:
+          type: string
+        phase:
+          type: integer
+        is_required:
+          type: boolean
+        depends_on:
+          type: array
+          items:
+            type: string
+        state:
+          type: string
+          enum:
+            - pending
+            - dispatching
+            - queued
+            - deploying
+            - verifying
+            - succeeded
+            - failed
+            - skipped
+            - cancelled
+        deployment_uuid:
+          type: string
+          nullable: true
+        deployment_status:
+          type: string
+          nullable: true
+        requested_commit:
+          type: string
+          nullable: true
+        actual_commit:
+          type: string
+          nullable: true
+        image_digest:
+          type: string
+          nullable: true
+        failure_reason:
+          type: string
+          nullable: true
+        note:
+          type: string
+          nullable: true
+          description: 'Why the resource is still waiting.'
+        attempts:
+          type: integer
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
       type: object
     ScheduledTask:
       description: 'Scheduled Task model'
@@ -15943,17 +17193,26 @@ tags:
     name: 'Cloud Tokens'
     description: 'Cloud Tokens'
   -
+    name: Configuration
+    description: Configuration
+  -
     name: Databases
     description: Databases
   -
     name: Deployments
     description: Deployments
   -
+    name: Releases
+    description: Releases
+  -
     name: Destinations
     description: Destinations
   -
     name: DigitalOcean
     description: DigitalOcean
+  -
+    name: Events
+    description: Events
   -
     name: 'GitHub Apps'
     description: 'GitHub Apps'
@@ -15969,6 +17228,9 @@ tags:
   -
     name: Notifications
     description: Notifications
+  -
+    name: Platform
+    description: Platform
   -
     name: Projects
     description: Projects

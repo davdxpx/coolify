@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Server;
+use App\Services\Distribution\BuildIdentity;
 use Illuminate\Support\Once;
 use Livewire\Features\SupportTesting\Testable;
 use Tests\TestCase;
@@ -28,6 +29,7 @@ uses(TestCase::class)->in('Feature', 'v4/Feature', 'v4/Browser');
 
 require_once __DIR__.'/Support/BrowserTestHelpers.php';
 require_once __DIR__.'/Support/ManagedDnsTestHelpers.php';
+require_once __DIR__.'/Support/DistributionTestHelpers.php';
 
 function remoteOutputSource(string $path): string
 {
@@ -80,6 +82,8 @@ uses()->beforeEach(function () {
 
     // Flush the Server identity map cache to ensure tests get fresh data
     Server::flushIdentityMap();
+
+    BuildIdentity::setCurrent(null);
 
 })->in('Feature', 'Unit', 'v4');
 

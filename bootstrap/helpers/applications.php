@@ -2,6 +2,7 @@
 
 use App\Actions\Application\StopApplication;
 use App\Enums\ApplicationDeploymentStatus;
+use App\Enums\DeploymentPhase;
 use App\Jobs\ApplicationDeploymentJob;
 use App\Jobs\VolumeCloneJob;
 use App\Models\Application;
@@ -12,14 +13,26 @@ use App\Models\EnvironmentVariable;
 use App\Models\Server;
 use App\Models\StandaloneDocker;
 use App\Notifications\Application\DeploymentFailed;
+use App\Services\Deployment\DeploymentFreezeGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Spatie\Url\Url;
 
-function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null)
+function queue_application_deployment(Application $application, string $deployment_uuid, ?int $pull_request_id = 0, ?string $commit = null, bool $force_rebuild = false, bool $is_webhook = false, bool $is_api = false, bool $restart_only = false, ?string $git_type = null, bool $no_questions_asked = false, ?Server $server = null, ?StandaloneDocker $destination = null, bool $only_this_server = false, bool $rollback = false, ?string $docker_registry_image_tag = null, ?string $parent_deployment_uuid = null, ?string $freeze_override_reason = null)
 {
     $commit = $commit ?: ($application->git_commit_sha ?: 'HEAD');
     $commit = validateGitRef($commit, 'deployment commit');
+    // Previews and the additional-server parts of an admitted deployment are not new changes.
+    if (blank($parent_deployment_uuid) && (int) $pull_request_id === 0) {
+        $freeze = app(DeploymentFreezeGuard::class)->blockingFreeze($application, $rollback, $freeze_override_reason, $deployment_uuid);
+        if ($freeze !== null) {
+            return [
+                'status' => 'skipped',
+                'message' => DeploymentFreezeGuard::describe($freeze),
+                'freeze_uuid' => $freeze->uuid,
+            ];
+        }
+    }
     $application_id = $application->id;
     $deployment_link = Url::fromString($application->link()."/deployment/{$deployment_uuid}");
     $deployment_url = $deployment_link->getPath();
@@ -86,6 +99,9 @@ function queue_application_deployment(Application $application, string $deployme
             'git_type' => $git_type,
             'only_this_server' => $only_this_server,
             'parent_deployment_uuid' => $parent_deployment_uuid,
+            'phase' => DeploymentPhase::QUEUED->value,
+            'phase_changed_at' => now(),
+            'phase_history' => [['phase' => DeploymentPhase::QUEUED->value, 'at' => now()->toIso8601String()]],
         ]);
 
         // Decide whether to start while the application and server rows are still locked,
@@ -95,6 +111,7 @@ function queue_application_deployment(Application $application, string $deployme
             $deployment->update([
                 'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
             ]);
+            $deployment->recordPhase(DeploymentPhase::ADMITTED, ['admitted_at' => now()]);
         }
 
         return ['deployment' => $deployment, 'started' => $started];
@@ -125,6 +142,7 @@ function queue_application_deployment(Application $application, string $deployme
 
             throw $exception;
         }
+        $deployment->recordPhase(DeploymentPhase::DISPATCHED, ['dispatched_at' => now()], [DeploymentPhase::ADMITTED]);
     }
 
     return [
@@ -221,6 +239,7 @@ function start_queued_deployment(ApplicationDeploymentQueue $deployment, bool $f
         $current->update([
             'status' => ApplicationDeploymentStatus::IN_PROGRESS->value,
         ]);
+        $current->recordPhase(DeploymentPhase::ADMITTED, ['admitted_at' => now()]);
 
         return true;
     });
@@ -238,6 +257,7 @@ function start_queued_deployment(ApplicationDeploymentQueue $deployment, bool $f
 
         return false;
     }
+    $deployment->recordPhase(DeploymentPhase::DISPATCHED, ['dispatched_at' => now()], [DeploymentPhase::ADMITTED]);
 
     return true;
 }
@@ -258,6 +278,7 @@ function fail_undispatchable_deployment(ApplicationDeploymentQueue $deployment, 
         return;
     }
 
+    $deployment->recordPhase(DeploymentPhase::FAILED);
     Log::warning("Deployment {$deployment->deployment_uuid} could not be started: {$exception->getMessage()}");
 
     $deployment->refresh();

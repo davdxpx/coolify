@@ -54,3 +54,4 @@ ref
 
 # Multi-instance local Coolify env files (scripts/dev-instances)
 .dev-instances/
+/build.json

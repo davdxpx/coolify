@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Services\Distribution\BuildIdentity;
+use App\Services\Distribution\CoolifyDistribution;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -75,16 +77,22 @@ class CheckForUpdatesJob implements ShouldBeEncrypted, ShouldQueue
 
                 CheckTraefikVersionJob::dispatch();
 
-                // Only mark new version available if Coolify version actually increased
-                if (version_compare($latest_version, $current_version, '>')) {
-                    // New version available
-                    $settings->update(['new_version_available' => true]);
-                } else {
-                    $settings->update(['new_version_available' => false]);
+                if (! BuildIdentity::current()->isCustom()) {
+                    // Only mark new version available if Coolify version actually increased
+                    if (version_compare($latest_version, $current_version, '>')) {
+                        // New version available
+                        $settings->update(['new_version_available' => true]);
+                    } else {
+                        $settings->update(['new_version_available' => false]);
+                    }
                 }
             }
         } catch (\Throwable $e) {
             // Consider implementing a notification to administrators
+        }
+
+        if (! isDev() && ! isCloud() && BuildIdentity::current()->isCustom()) {
+            app(CoolifyDistribution::class)->refresh();
         }
     }
 }

@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Project\Application\Deployment;
 
+use App\Enums\ApplicationDeploymentStatus;
 use App\Models\Application;
 use App\Models\ApplicationDeploymentQueue;
 use App\Traits\AuditsApplicationSettings;
+use Illuminate\Support\Carbon;
 use Livewire\Component;
 
 class Show extends Component
@@ -133,6 +135,40 @@ class Show extends Component
             ->join("\n");
 
         return sanitizeLogsForExport($logs);
+    }
+
+    /**
+     * @return array{state: array{label: string, type: string, description: string, phase: ?string}, timeline: array<string, Carbon>, blocking: ?string}
+     */
+    public function getExecutionSummaryProperty(): array
+    {
+        $deployment = $this->application_deployment_queue;
+        $timeline = array_filter([
+            'Requested' => $deployment->created_at,
+            'Slot reserved' => $deployment->admitted_at,
+            'Handed to worker' => $deployment->dispatched_at,
+            'Worker started' => $deployment->started_at,
+            'Finished' => $deployment->finished_at,
+        ]);
+
+        $blocking = null;
+        if ($deployment->status === ApplicationDeploymentStatus::QUEUED->value) {
+            $sameApplicationRunning = ApplicationDeploymentQueue::query()
+                ->where('application_id', $deployment->application_id)
+                ->where('pull_request_id', $deployment->pull_request_id)
+                ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
+                ->exists();
+            $server = $deployment->server;
+            $busy = ApplicationDeploymentQueue::query()
+                ->where('server_id', $deployment->server_id)
+                ->where('status', ApplicationDeploymentStatus::IN_PROGRESS->value)
+                ->count();
+            $blocking = $sameApplicationRunning
+                ? 'Waiting for the running deployment of this application to finish.'
+                : "Waiting for a deployment slot: {$busy} of ".($server?->settings?->concurrent_builds ?? '?').' slots on '.($server?->name ?? 'the server').' are in use.';
+        }
+
+        return ['state' => $deployment->displayState(), 'timeline' => $timeline, 'blocking' => $blocking, 'images' => (array) data_get($deployment->artifacts, 'images', [])];
     }
 
     public function render()

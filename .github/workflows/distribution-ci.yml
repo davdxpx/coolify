@@ -1,0 +1,116 @@
+name: Distribution CI
+
+on:
+  pull_request:
+  workflow_call:
+    outputs:
+      latest_migration:
+        description: Newest migration in this commit
+        value: ${{ jobs.tests.outputs.latest_migration }}
+      migration_count:
+        description: Number of migrations in this commit
+        value: ${{ jobs.tests.outputs.migration_count }}
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: distribution-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  scripts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Check shell syntax
+        run: |
+          bash -n scripts/upgrade-distribution.sh
+          bash -n scripts/distribution/inventory.sh
+          bash -n scripts/distribution/upgrade-smoke-test.sh
+          bash -n scripts/distribution/publish-manifest.sh
+
+      - name: ShellCheck
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo koalaman/shellcheck:v0.10.0 -S warning \
+            scripts/upgrade-distribution.sh scripts/distribution/inventory.sh scripts/distribution/upgrade-smoke-test.sh scripts/distribution/publish-manifest.sh
+
+      - name: Validate workflow and manifest tooling
+        run: php -l scripts/distribution/manifest.php && php -l docker/production/write-build-identity.php
+
+  tests:
+    runs-on: ubuntu-24.04
+    outputs:
+      latest_migration: ${{ steps.migrations.outputs.latest }}
+      migration_count: ${{ steps.migrations.outputs.count }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo_sqlite, pdo_pgsql, intl, zip, gd, bcmath, pcntl, redis
+          coverage: none
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+
+      - name: Build frontend assets
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare environment
+        run: |
+          cp .env.development.example .env
+          php artisan key:generate --force
+
+      - name: Run tests
+        env:
+          APP_CONFIG_CACHE: /tmp/coolify-test-cache/config.php
+          APP_ROUTES_CACHE: /tmp/coolify-test-cache/routes.php
+          APP_EVENTS_CACHE: /tmp/coolify-test-cache/events.php
+          APP_SERVICES_CACHE: /tmp/coolify-test-cache/services.php
+          APP_PACKAGES_CACHE: /tmp/coolify-test-cache/packages.php
+        # The suite expects Coolify's development container, which runs as root (open-file limits,
+        # libvirt storage paths, dev script fixtures).
+        run: |
+          mkdir -p /tmp/coolify-test-cache
+          sudo --preserve-env env "PATH=$PATH" php vendor/bin/pest --compact --log-junit /tmp/coolify-junit.xml tests/Unit tests/Feature tests/v4/Feature
+
+      - name: List failed tests
+        if: ${{ failure() }}
+        run: |
+          # shellcheck disable=SC2016
+          php -r '$xml = simplexml_load_file("/tmp/coolify-junit.xml"); foreach ($xml->xpath("//testcase[failure or error]") as $case) { $node = $case->failure ?: $case->error; echo $case["class"], " > ", $case["name"], PHP_EOL, "    ", strtok(trim((string) $node), PHP_EOL), PHP_EOL; }'
+
+      - name: Record migration state
+        id: migrations
+        run: |
+          LATEST=$(find database/migrations -maxdepth 1 -name '*.php' -printf '%f\n' | sed 's/\.php$//' | sort | tail -n1)
+          COUNT=$(find database/migrations -maxdepth 1 -name '*.php' | wc -l)
+          echo "latest=${LATEST}" >> "$GITHUB_OUTPUT"
+          echo "count=${COUNT}" >> "$GITHUB_OUTPUT"
+
+      - name: Check code style of changed PHP files
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch --no-tags --depth=1 origin "${BASE_SHA}"
+          mapfile -t FILES < <(git diff --name-only --diff-filter=ACMR "${BASE_SHA}" HEAD -- '*.php')
+          if [ "${#FILES[@]}" -gt 0 ]; then
+            vendor/bin/pint --test "${FILES[@]}"
+          fi

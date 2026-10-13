@@ -8,6 +8,7 @@ use App\Models\ApplicationPreview;
 use App\Models\ApplicationSetting;
 use App\Models\CloudInitScript;
 use App\Models\CloudProviderToken;
+use App\Models\DeploymentFreeze;
 use App\Models\DiscordNotificationSettings;
 use App\Models\EmailNotificationSettings;
 use App\Models\Environment;
@@ -19,6 +20,7 @@ use App\Models\IntegrationToken;
 use App\Models\PrivateKey;
 use App\Models\Project;
 use App\Models\PushoverNotificationSettings;
+use App\Models\ReleaseGroup;
 use App\Models\S3Storage;
 use App\Models\ScheduledTask;
 use App\Models\Server;
@@ -49,6 +51,7 @@ use App\Policies\ApplicationSettingPolicy;
 use App\Policies\CloudInitScriptPolicy;
 use App\Policies\CloudProviderTokenPolicy;
 use App\Policies\DatabasePolicy;
+use App\Policies\DeploymentFreezePolicy;
 use App\Policies\EnvironmentPolicy;
 use App\Policies\EnvironmentVariablePolicy;
 use App\Policies\GithubAppPolicy;
@@ -58,6 +61,7 @@ use App\Policies\IntegrationTokenPolicy;
 use App\Policies\NotificationPolicy;
 use App\Policies\PrivateKeyPolicy;
 use App\Policies\ProjectPolicy;
+use App\Policies\ReleaseGroupPolicy;
 use App\Policies\ResourceCreatePolicy;
 use App\Policies\S3StoragePolicy;
 use App\Policies\ScheduledTaskPolicy;
@@ -87,6 +91,8 @@ class AuthServiceProvider extends ServiceProvider
         StandaloneDocker::class => StandaloneDockerPolicy::class,
         SwarmDocker::class => SwarmDockerPolicy::class,
         Application::class => ApplicationPolicy::class,
+        ReleaseGroup::class => ReleaseGroupPolicy::class,
+        DeploymentFreeze::class => DeploymentFreezePolicy::class,
         ApplicationPreview::class => ApplicationPreviewPolicy::class,
         ApplicationSetting::class => ApplicationSettingPolicy::class,
         Service::class => ServicePolicy::class,
