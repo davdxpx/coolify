@@ -147,8 +147,9 @@ it('fails pull request jobs in the job-started hook and lets other jobs run', fu
     $hook = tempnam(sys_get_temp_dir(), 'hook');
     file_put_contents($hook, GithubRunnerContainer::pullRequestHookScript());
 
-    $environment = $eventName === null ? [] : ['GITHUB_EVENT_NAME' => $eventName];
-    $process = new Process(['bash', $hook], env: ['PATH' => getenv('PATH'), ...$environment]);
+    // Process inherits the parent environment, and a GitHub Actions runner exports GITHUB_EVENT_NAME
+    // itself. False removes the inherited value, so the unknown-event case really has no event name.
+    $process = new Process(['bash', $hook], env: ['PATH' => getenv('PATH'), 'GITHUB_EVENT_NAME' => $eventName ?? false]);
     $process->run();
     unlink($hook);
 

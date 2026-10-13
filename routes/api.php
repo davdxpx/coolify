@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\TagsController;
 use App\Http\Controllers\Api\TeamController;
 use App\Http\Controllers\Api\VolumeBackupsController;
 use App\Http\Controllers\Api\VultrController;
+use App\Http\Controllers\Api\ZeroDowntimeController;
 use App\Http\Middleware\ApiAllowed;
 use Illuminate\Support\Facades\Route;
 
@@ -186,6 +187,8 @@ Route::group([
     Route::get('/platform/overview', [PlatformController::class, 'overview'])->middleware(['api.ability:read']);
     Route::get('/platform/metrics', [PlatformController::class, 'metrics'])->middleware(['api.ability:read']);
     Route::get('/applications/{uuid}/rollback-candidates', [PlatformController::class, 'rollbackCandidates'])->middleware(['api.ability:read']);
+    Route::get('/applications/{uuid}/zero-downtime', [ZeroDowntimeController::class, 'show'])->middleware(['api.ability:read']);
+    Route::patch('/applications/{uuid}/zero-downtime', [ZeroDowntimeController::class, 'update'])->middleware(['api.ability:write']);
     Route::get('/backups/freshness', [PlatformController::class, 'backupFreshness'])->middleware(['api.ability:read']);
     Route::get('/databases/{uuid}/restore-evidence', [PlatformController::class, 'restoreEvidence'])->middleware(['api.ability:read']);
     Route::post('/databases/{uuid}/restore-evidence', [PlatformController::class, 'storeRestoreEvidence'])->middleware(['api.ability:write']);
