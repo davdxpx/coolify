@@ -15483,6 +15483,80 @@ paths:
       security:
         -
           bearerAuth: []
+  '/applications/{uuid}/zero-downtime':
+    get:
+      tags:
+        - Applications
+      summary: 'Zero-downtime deployment of a Compose application'
+      description: 'Whether zero-downtime (blue/green) deployment is enabled and whether the Compose file allows it, with the reasons.'
+      operationId: get-application-zero-downtime
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 'State and eligibility.'
+          content:
+            application/json:
+              schema:
+                properties:
+                  enabled: { type: boolean }
+                  eligible: { type: boolean }
+                  blocking: { type: array, items: { type: string } }
+                  warnings: { type: array, items: { type: string } }
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '404':
+          $ref: '#/components/responses/404'
+      security:
+        -
+          bearerAuth: []
+    patch:
+      tags:
+        - Applications
+      summary: 'Enable or disable zero-downtime deployment'
+      operationId: update-application-zero-downtime
+      parameters:
+        -
+          name: uuid
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              required:
+                - enabled
+              properties:
+                enabled:
+                  type: boolean
+              type: object
+      responses:
+        '200':
+          description: 'Updated state.'
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: '#/components/responses/401'
+        '403':
+          description: 'Not allowed to update the application.'
+        '404':
+          $ref: '#/components/responses/404'
+        '422':
+          description: 'The Compose file does not allow it; `blocking` lists why.'
+      security:
+        -
+          bearerAuth: []
 components:
   schemas:
     DatabaseImportRequest:
@@ -16297,6 +16371,9 @@ components:
           type: boolean
         is_raw_compose_deployment_enabled:
           type: boolean
+        is_compose_blue_green_enabled:
+          type: boolean
+          description: 'Deploy Docker Compose applications without downtime: the new version starts next to the old one and takes over when healthy.'
         is_build_server_enabled:
           type: boolean
         is_consistent_container_name_enabled:

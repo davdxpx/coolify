@@ -22,6 +22,7 @@ use App\Models\StandaloneDocker;
 use App\Models\SwarmDocker;
 use App\Notifications\Application\DeploymentFailed;
 use App\Notifications\Application\DeploymentSuccess;
+use App\Services\Deployment\ComposeBlueGreen;
 use App\Services\Deployment\DeploymentArtifacts;
 use App\Support\RemoteSecretReferences;
 use App\Support\RemoteSecretValueFormatter;
@@ -88,6 +89,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
     public static int $batch_counter = 0;
 
     private bool $newVersionIsHealthy = false;
+
+    private ?string $composeProjectName = null;
+
+    private string $composeUpOptions = '';
 
     private ApplicationDeploymentQueue $application_deployment_queue;
 
@@ -934,7 +939,10 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
 
         $this->pull_docker_compose_images();
 
-        $this->stop_running_container(force: true);
+        $blueGreen = $this->composeBlueGreenPlan();
+        if ($blueGreen === null) {
+            $this->stop_running_container(force: true);
+        }
         $this->application_deployment_queue->addLogEntry('Starting new application.');
         $networkId = $this->application->uuid;
         if ($this->pull_request_id !== 0) {
@@ -954,9 +962,80 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
             ]);
         }
 
-        $this->start_docker_compose_services();
+        if ($blueGreen === null) {
+            $this->start_docker_compose_services();
+        } else {
+            $this->switch_compose_blue_green($blueGreen);
+        }
 
         $this->application_deployment_queue->addLogEntry('New container started.');
+    }
+
+    /**
+     * The zero-downtime plan when the application enables it and its Compose file allows it.
+     *
+     * @return array{current: string|null, next: string, containers: list<array{name: string, project: string, service: string}>}|null
+     */
+    private function composeBlueGreenPlan(): ?array
+    {
+        if (! $this->application->settings?->is_compose_blue_green_enabled || $this->pull_request_id !== 0) {
+            return null;
+        }
+
+        $report = app(ComposeBlueGreen::class)->analyze($this->application);
+        if (! $report['eligible']) {
+            $this->application_deployment_queue->addLogEntry('Zero-downtime deployment is enabled but not possible: '.implode(' ', $report['blocking']).' Deploying with a short interruption instead.', 'stderr');
+
+            return null;
+        }
+
+        $this->execute_remote_command([
+            ComposeBlueGreen::listContainersCommand($this->application->uuid),
+            'hidden' => true,
+            'ignore_errors' => true,
+            'save' => 'compose_blue_green_containers',
+            'append' => false,
+        ]);
+        $containers = ComposeBlueGreen::parseContainers((string) $this->saved_outputs->get('compose_blue_green_containers'));
+
+        return ComposeBlueGreen::plan($this->application->uuid, $containers) + ['containers' => $containers];
+    }
+
+    /**
+     * Starts the new version as a second Compose project and waits until it is healthy. The proxy
+     * serves both versions meanwhile; only then the previous containers are stopped. If the new
+     * version does not become healthy, it is removed and the previous one keeps serving.
+     *
+     * @param  array{current: string|null, next: string, containers: list<array{name: string, project: string, service: string}>}  $plan
+     */
+    private function switch_compose_blue_green(array $plan): void
+    {
+        $this->application_deployment_queue->addLogEntry('Zero-downtime deployment: starting the new version as Compose project '.$plan['next'].($plan['current'] ? " while {$plan['current']} keeps serving." : '.'));
+        $this->composeProjectName = $plan['next'];
+        $this->composeUpOptions = ' --wait --wait-timeout '.ComposeBlueGreen::WAIT_SECONDS;
+
+        try {
+            $this->start_docker_compose_services();
+        } catch (Throwable $e) {
+            $this->application_deployment_queue->addLogEntry('The new version did not start or did not become healthy. It is removed; the previous version keeps serving.', 'stderr');
+            $this->execute_remote_command([ComposeBlueGreen::removeProjectCommand($plan['next']), 'hidden' => true, 'ignore_errors' => true]);
+
+            throw new DeploymentException('Zero-downtime deployment failed: the new version did not become healthy. The previous version is still running.', 0, $e);
+        } finally {
+            $this->composeProjectName = null;
+            $this->composeUpOptions = '';
+        }
+
+        $previous = array_filter($plan['containers'], fn (array $container) => $container['project'] !== $plan['next']);
+        foreach ($previous as $container) {
+            $this->graceful_shutdown_container($container['name']);
+        }
+        $this->application_deployment_queue->addLogEntry($previous === [] ? 'The new version is running.' : 'The new version is healthy; the previous version was stopped.');
+    }
+
+    private function composeProjectName(): string
+    {
+        return $this->composeProjectName ?? $this->application->uuid;
     }
 
     /**
@@ -1071,7 +1150,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 if ($this->preserveRepository) {
                     // Always use .env file
                     $command .= " --env-file {$server_workdir}/.env";
-                    $command .= " --project-name {$this->application->uuid} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d";
+                    $command .= " --project-name {$this->composeProjectName()} --project-directory {$server_workdir} -f {$server_workdir}{$this->docker_compose_location} up -d{$this->composeUpOptions}";
                     $this->write_deployment_configurations();
 
                     $this->execute_remote_command(
@@ -1080,7 +1159,7 @@ class ApplicationDeploymentJob implements ShouldBeEncrypted, ShouldQueue
                 } else {
                     // Always use .env file
                     $command .= " --env-file {$this->workdir}/.env";
-                    $command .= " --project-name {$this->application->uuid} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d";
+                    $command .= " --project-name {$this->composeProjectName()} --project-directory {$this->workdir} -f {$this->workdir}{$this->docker_compose_location} up -d{$this->composeUpOptions}";
                     $this->execute_remote_command(
                         [executeInDocker($this->deployment_uuid, $command), 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
                     );
