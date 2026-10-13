@@ -1,0 +1,375 @@
+{
+    "schema_version": 1,
+    "distribution": "davdxpx/coolify",
+    "image": "ghcr.io/davdxpx/coolify",
+    "channels": [],
+    "releases": [],
+    "generated_at": "2026-10-13T19:18:49Z",
+    "upstream": {
+        "repository": "coollabsio/coolify",
+        "latest_release": "4.4.6",
+        "latest_release_published_at": "2026-10-09T18:42:05Z",
+        "base_version": "4.4.6",
+        "commits_behind": 3,
+        "sync": {
+            "state": "merged",
+            "branch": null,
+            "pull_request": null,
+            "conflicting_files": []
+        },
+        "advisories": [
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-chg4-63hm-xv9x",
+                "severity": "high",
+                "summary": "Authenticated RCE via SHELL_SAFE_COMMAND_PATTERN regression \u2192 host root",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-chg4-63hm-xv9x"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-w8wm-r924-f65v",
+                "severity": "high",
+                "summary": "Unauthenticated Deployment Trigger via Webhook HMAC Bypass with Null Secret",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-w8wm-r924-f65v"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-f35h-g2c2-q36v",
+                "severity": "low",
+                "summary": "OS Command Injection via Database Credential Fields in Docker Compose Service Commands",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-f35h-g2c2-q36v"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-725v-f5gh-22q9",
+                "severity": "critical",
+                "summary": "Cross-Team IDOR: Livewire Components Accept Unscoped server_id and destination_uuid \u2014 Deploy to Other Teams' Servers",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-725v-f5gh-22q9"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-c83f-5ph7-x8xv",
+                "severity": "low",
+                "summary": "Sanctum API Tokens Have No Expiration \u2014 Leaked Tokens Grant Permanent Access",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-c83f-5ph7-x8xv"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-6pmw-6m96-4v4m",
+                "severity": "high",
+                "summary": "OS Command Injection via Persistent Volume Names - Root RCE on Managed Servers",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-6pmw-6m96-4v4m"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-gvc4-f276-r88p",
+                "severity": "high",
+                "summary": "PostgreSQL Healthcheck Command Injection Allows Root Code Execution in Container",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-gvc4-f276-r88p"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-mv4c-9x67-rrmv",
+                "severity": "high",
+                "summary": "PostgreSQL Init Script Path Traversal Leads to Arbitrary File Write and Root RCE",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-mv4c-9x67-rrmv"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-x9qh-w4c4-54f9",
+                "severity": "low",
+                "summary": "Command Injection via Unescaped Version String in Docker Build",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-x9qh-w4c4-54f9"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-qfcc-2fm3-9q42",
+                "severity": "high",
+                "summary": "Cross-Team IDOR via Unscoped Server and Project Lookups Exposes SSH Keys and Infrastructure",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-qfcc-2fm3-9q42"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-mf8p-rj62-9f9m",
+                "severity": "high",
+                "summary": "Authenticated Remote Code Execution via Command Injection in Destination Network Management",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-mf8p-rj62-9f9m"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-q9j6-xcvx-px63",
+                "severity": "high",
+                "summary": "Authenticated Remote Code Execution in GetLogs Livewire Component",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-q9j6-xcvx-px63"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.470",
+                "id": "GHSA-9pp4-wcmj-rq73",
+                "severity": "high",
+                "summary": " Authenticated Host RCE in Coolify v4",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-9pp4-wcmj-rq73"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-mh8x-fppq-cp77",
+                "severity": "high",
+                "summary": "Command injection via unsanitized persistent storage name in docker volume commands",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-mh8x-fppq-cp77"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-pwm4-w33c-wjf3",
+                "severity": "medium",
+                "summary": "SSRF via S3 Storage Endpoint in testConnection()",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-pwm4-w33c-wjf3"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-4mpw-wcj4-v9pp",
+                "severity": "low",
+                "summary": "Incomplete fix for CVE-2025-66209: Command Injection via unsanitized MongoDB collection names in database backup",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-4mpw-wcj4-v9pp"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-mw6q-2hmg-mhxv",
+                "severity": "critical",
+                "summary": "Missing authorization on terminal websocket bootstrap routes allows low-privileged members to execute commands on team servers",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-mw6q-2hmg-mhxv"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-652w-qv22-2r7c",
+                "severity": "critical",
+                "summary": "WebSocket Endpoint Access Control Flaw Leading to Remote Code Execution",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-652w-qv22-2r7c"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-6r3g-w7x8-54fj",
+                "severity": "high",
+                "summary": "Authenticated Remote Code Execution via Command Injection in Database Import Container Name",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-6r3g-w7x8-54fj"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-rh5x-qx77-fq9v",
+                "severity": "high",
+                "summary": "OS Command Injection via Unmanaged Container Operations - Remote Code Execution",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-rh5x-qx77-fq9v"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-5qp8-9gg7-4c86",
+                "severity": "high",
+                "summary": "Command Injection via Newline in Pre/Post Deployment Commands (Heredoc Transport)",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-5qp8-9gg7-4c86"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-46hp-7m8g-7622",
+                "severity": "high",
+                "summary": "Coolify RCE via LocalFileVolume `fs_path`",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-46hp-7m8g-7622"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-782c-3jq5-fw4j",
+                "severity": "low",
+                "summary": "Multiple Low-Severity Security Issues (Email Verification Bypass, CLI Injection, Weak Hashing)",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-782c-3jq5-fw4j"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-c339-w3cq-2rjr",
+                "severity": "medium",
+                "summary": "Settings/Updates Livewire Component Missing isInstanceAdmin() Authorization Check",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-c339-w3cq-2rjr"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-66gv-g2w9-6wxp",
+                "severity": "low",
+                "summary": "File Upload Without Type or Size Validation in Database Backup Restore",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-66gv-g2w9-6wxp"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.474",
+                "id": "GHSA-v64c-v633-58xp",
+                "severity": "medium",
+                "summary": "Unauthenticated Feedback Endpoint Allows Abuse (No Auth, No Rate Limit)",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-v64c-v633-58xp"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.466",
+                "id": "GHSA-f47p-xrgc-977v",
+                "severity": "medium",
+                "summary": "API ability mismatch allows mutation with `read` token",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-f47p-xrgc-977v"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.466",
+                "id": "GHSA-565g-9j4m-wqmr",
+                "severity": "high",
+                "summary": "Cross-team IDOR in logs component (resource lookup not team-scoped)",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-565g-9j4m-wqmr"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.466",
+                "id": "GHSA-rpr8-p7jc-x844",
+                "severity": "high",
+                "summary": "Host RCE via Sentinel token injection",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-rpr8-p7jc-x844"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.466",
+                "id": "GHSA-3xm2-hqg8-4m2p",
+                "severity": "high",
+                "summary": "Host RCE via Log Drain secret/env command injection",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-3xm2-hqg8-4m2p"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-4vff-6j8j-qhcg",
+                "severity": "low",
+                "summary": "Authenticated Host-Level RCE via Unescaped Database Credentials in Backup Jobs",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-4vff-6j8j-qhcg"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-389w-cc6x-wr2m",
+                "severity": "high",
+                "summary": "Account takeover via CSRF-able GET endpoint that resets password to attacker-known value",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-389w-cc6x-wr2m"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-cgj8-7m5q-x5gv",
+                "severity": "medium",
+                "summary": "Password reset link poisoning via X-Forwarded-Host header spoofing",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-cgj8-7m5q-x5gv"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-3g6r-cxv5-3c7h",
+                "severity": "medium",
+                "summary": "Server-Side Request Forgery via attacker-controlled GitHub App API URL",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-3g6r-cxv5-3c7h"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.471",
+                "id": "GHSA-962v-gxmw-56hc",
+                "severity": "medium",
+                "summary": "Cross-tenant activity log disclosure via unlocked Livewire property in ActivityMonitor",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-962v-gxmw-56hc"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.469",
+                "id": "GHSA-j6j2-frv3-g6f7",
+                "severity": "high",
+                "summary": "Command injection via single-quote breakout in Docker Compose custom commands",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-j6j2-frv3-g6f7"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.464",
+                "id": "GHSA-ggrr-wrvr-x83v",
+                "severity": "critical",
+                "summary": "Cross-Tenant Resource Cloning via Broken Object-Level Authorization in cloneTo()",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-ggrr-wrvr-x83v"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.464",
+                "id": "GHSA-6h8g-wpxp-cq98",
+                "severity": "medium",
+                "summary": "Command Injection via Single-Quote Breakout in `executeInDocker()`",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-6h8g-wpxp-cq98"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.464",
+                "id": "GHSA-9x6p-29p3-h466",
+                "severity": "medium",
+                "summary": "Cross-team application domain enumeration via domains_by_server endpoint",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-9x6p-29p3-h466"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.464",
+                "id": "GHSA-5p5w-h58c-2h5m",
+                "severity": "medium",
+                "summary": "Cross-team deployment information disclosure via GET /api/v1/deployments/{uuid} (IDOR)",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-5p5w-h58c-2h5m"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.464",
+                "id": "GHSA-f6h4-qx26-76jv",
+                "severity": "medium",
+                "summary": "IDOR in Deployment API - Cross-Team Deployment Information Disclosure",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-f6h4-qx26-76jv"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.464",
+                "id": "GHSA-7g97-c4xv-3cjx",
+                "severity": "high",
+                "summary": "Authenticated RCE via command injection in CA certificate management feature",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-7g97-c4xv-3cjx"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.469",
+                "id": "GHSA-qqrq-r9h4-x6wp",
+                "severity": "critical",
+                "summary": "Authenticated Remote Command Injection leading to RCE and Secrets Exfiltration",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-qqrq-r9h4-x6wp"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.461",
+                "id": "GHSA-x525-46rq-mr8c",
+                "severity": "medium",
+                "summary": "Timing Attack in GitLab Webhook Token Validation",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-x525-46rq-mr8c"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.469",
+                "id": "GHSA-4fhp-xqqp-w7vv",
+                "severity": "high",
+                "summary": "OS Command Injection in Health Check Configuration Allows Remote Code Execution",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-4fhp-xqqp-w7vv"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.451",
+                "id": "GHSA-cj2c-9jx8-j427",
+                "severity": "critical",
+                "summary": "Authenticated Remote Code Execution via Command Injection in File Storage Directory Mount Path",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-cj2c-9jx8-j427"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.451",
+                "id": "GHSA-q7rg-2j7p-83gp",
+                "severity": "critical",
+                "summary": "Authenticated Remote Code Execution via Command Injection in Dynamic Proxy Configuration Filename",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-q7rg-2j7p-83gp"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.451",
+                "id": "GHSA-24mp-fc9q-c884",
+                "severity": "critical",
+                "summary": "Authenticated Remote Code Execution via Command Injection in PostgreSQL Init Script Filename",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-24mp-fc9q-c884"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.451",
+                "id": "GHSA-vm5p-43qh-7pmq",
+                "severity": "critical",
+                "summary": "Authenticated Remote Code Execution via Command Injection in Database Backup",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-vm5p-43qh-7pmq"
+            },
+            {
+                "first_patched_version": "4.0.0-beta.451",
+                "id": "GHSA-q33h-22xm-4cgh",
+                "severity": "critical",
+                "summary": "Authenticated Remote Code Execution via Command Injection in Database Import",
+                "url": "https://github.com/coollabsio/coolify/security/advisories/GHSA-q33h-22xm-4cgh"
+            }
+        ],
+        "last_synced_at": "2026-10-12T15:14:30+02:00",
+        "checked_at": "2026-10-13T19:18:48Z"
+    }
+}
