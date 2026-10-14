@@ -4,7 +4,7 @@
     "image": "ghcr.io/davdxpx/coolify",
     "channels": [],
     "releases": [],
-    "generated_at": "2026-10-13T19:18:49Z",
+    "generated_at": "2026-10-14T04:56:03Z",
     "upstream": {
         "repository": "coollabsio/coolify",
         "latest_release": "4.4.6",
@@ -370,6 +370,6 @@
             }
         ],
         "last_synced_at": "2026-10-12T15:14:30+02:00",
-        "checked_at": "2026-10-13T19:18:48Z"
+        "checked_at": "2026-10-14T04:56:03Z"
     }
 }
