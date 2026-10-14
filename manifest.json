@@ -4,13 +4,13 @@
     "image": "ghcr.io/davdxpx/coolify",
     "channels": [],
     "releases": [],
-    "generated_at": "2026-10-14T11:55:51Z",
+    "generated_at": "2026-10-14T17:12:53Z",
     "upstream": {
         "repository": "coollabsio/coolify",
         "latest_release": "4.4.6",
         "latest_release_published_at": "2026-10-09T18:42:05Z",
         "base_version": "4.4.6",
-        "commits_behind": 5,
+        "commits_behind": 6,
         "sync": {
             "state": "merged",
             "branch": null,
@@ -370,6 +370,6 @@
             }
         ],
         "last_synced_at": "2026-10-12T15:14:30+02:00",
-        "checked_at": "2026-10-14T11:55:50Z"
+        "checked_at": "2026-10-14T17:12:52Z"
     }
 }
